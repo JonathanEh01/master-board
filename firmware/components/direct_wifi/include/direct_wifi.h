@@ -43,6 +43,6 @@ void wifi_send_data(uint8_t *data, int len);
 void wifi_attach_recv_cb(void (*cb)(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len));
 void wifi_detach_recv_cb();
 void wifi_change_channel(uint8_t wifi_channel);
-static void wifi_recv_func(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len);
+void wifi_recv_func(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len);
 
 #endif

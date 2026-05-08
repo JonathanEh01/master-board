@@ -1,4 +1,5 @@
 #include "direct_wifi.h"
+#include "esp_mac.h"
 
 // global variables
 static const char *WIFI_TAG = "Direct_Wifi";
@@ -25,13 +26,13 @@ void wifi_send_data(uint8_t *data, int len)
 }
 
 
-/**
-* @brief    Execute the recieve callback function
-*
-* @param    data    Pointer to the data to be sent
-* @param    len     Length of the data to be sent
-*/
-static void wifi_recv_func(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len)
+//**
+// * @brief    Execute the recieve callback function
+// *
+// * @param    data    Pointer to the data to be sent
+// * @param    len     Length of the data to be sent
+// */
+void wifi_recv_func(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len)
 {
   if (wifi_recv_cb == NULL)
   {
@@ -43,13 +44,13 @@ static void wifi_recv_func(const esp_now_recv_info_t *esp_now_info, const uint8_
   }
 }
 
-static void wifi_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status)
-{
-  if (status != ESP_OK)
-  {
-    ESP_LOGW(WIFI_TAG, "Failed to send data to " MACSTR ", status: %d", MAC2STR(mac_addr), status);
-  }
-}
+// static void wifi_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status)
+// {
+//   if (status != ESP_OK)
+//   {
+//     ESP_LOGW(WIFI_TAG, "Failed to send data to "MACSTR", status: %d", MAC2STR(mac_addr), status);
+//   }
+// }
 
 void wifi_attach_recv_cb(void (*cb)(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len))
 {
@@ -73,9 +74,9 @@ void wifi_init()
   ESP_ERROR_CHECK(ret);
 
   // wifi/lwip init phase
-  ESP_ERROR_CHECK(esp_netif_init()); // s1.1
-  ESP_ERROR_CHECK(esp_event_loop_create_default()); // s1.2
-  ESP_ERROR_CHECK(esp_netif_create_default_wifi_sta()); // s1.3
+  esp_netif_init(); // s1.1
+  // ESP_ERROR_CHECK(esp_event_loop_create_default()); // s1.2
+  esp_netif_create_default_wifi_sta(); // s1.3
 
   wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
   cfg.ampdu_tx_enable = 0;

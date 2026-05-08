@@ -31,12 +31,6 @@ void config_demux()
 
 void IRAM_ATTR spi_pre_transfer_callback(spi_transaction_t *trans)
 {
-    /*
-    uint slave_nb = ((spi_trans_info_t*) trans->user)->demux_nb;
-    gpio_set_level(GPIO_DEMUX_A0, slave_nb&0x1);
-    gpio_set_level(GPIO_DEMUX_A1, (slave_nb>>1)&0x1);
-    gpio_set_level(GPIO_DEMUX_A2, (slave_nb>>2)&0x1);
-    */
     return;
 }
 

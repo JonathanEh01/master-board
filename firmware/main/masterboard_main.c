@@ -45,7 +45,6 @@ uint16_t session_id = 0; // session id
 
 const char *TAG = "main";
 static char eth_or_wifi_flag = 'e'; // 'e' for ethernet, 'w' for wifi
-// bool use_wifi = false; // true if wifi is used, false if ethernet is used
 
 int wifi_channel = 1;
 
@@ -455,17 +454,32 @@ void setup_spi()
     gpio_set_direction(CONFIG_BUTTON_GPIO, GPIO_MODE_INPUT);
 }
 
+//**
+// * @brief    Check if the received message is a valid init message
+//*/
 bool check_init_msg(const int data_len)
 {
     return (data_len == sizeof(struct wifi_eth_packet_init)) && (current_state == WAITING_FOR_INIT || current_state == WIFI_ETH_ERROR);
 };
 
+//**
+// * @brief    Check if the received message is a valid command message
+//*/
 bool check_command_msg(const int data_len)
 {
     return (data_len == sizeof(struct wifi_eth_packet_command)) && (current_state == SENDING_INIT_ACK || current_state == ACTIVE_CONTROL);
 };
 
-void recieve_cb(uint8_t src_mac[6], uint8_t *data, int data_len, char eth_or_wifi)
+//**
+// * @brief    Generic receive callback function
+// *
+// * Since both the ethernet and wifi drivers were migrated to ESP-IDF v6.0.1,
+// * the function arguments for their receive callbacks have changed and no
+// * longer match. To avoid code duplication, this generic callback function is
+// * called by both the ethernet and wifi receive callbacks, with the appropriate
+// * arguments passed in.
+//*/
+void receive_cb(uint8_t src_mac[6], uint8_t *data, int data_len, char eth_or_wifi)
 {
     eth_or_wifi_flag = eth_or_wifi;
     if (check_init_msg(data_len))
@@ -492,7 +506,6 @@ void recieve_cb(uint8_t src_mac[6], uint8_t *data, int data_len, char eth_or_wif
 
         if (current_state == WAITING_FOR_INIT)
         {
-            // use_wifi() = (eth_or_wifi == 'w');
 
             // if wifi is used, ethernet is deinitialized (eth stopped and driver uninstalled)
             // we avoid deinitializing ethernet if it has already been
@@ -523,7 +536,6 @@ void recieve_cb(uint8_t src_mac[6], uint8_t *data, int data_len, char eth_or_wif
 
         if (packet_recv->session_id != session_id)
         {
-            // printf("Wrong session id, got %d instead of %d, ignoring packet\n", packet_recv->session_id, session_id);
             return; // ignoring packet
         }
 
@@ -547,17 +559,23 @@ void recieve_cb(uint8_t src_mac[6], uint8_t *data, int data_len, char eth_or_wif
     return;
 };
 
-void wifi_recieve_cb(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len)
+//**
+// * @brief    WiFi receive callback function
+//*/
+void wifi_receive_cb(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len)
 {
     uint8_t src_mac[6];
     memcpy(src_mac, esp_now_info->src_addr, 6);
-    recieve_cb(src_mac, (uint8_t *)data, data_len, 'w');
+    receive_cb(src_mac, (uint8_t *)data, data_len, 'w');
     return;
 };
 
-void eth_recieve_cb(uint8_t src_mac[6], uint8_t *data, int len, char eth_or_wifi)
+//**
+// * @brief    Ethernet receive callback function
+//*/
+void eth_receive_cb(uint8_t src_mac[6], uint8_t *data, int len, char eth_or_wifi)
 {
-    recieve_cb(src_mac, data, len, eth_or_wifi);
+    receive_cb(src_mac, data, len, eth_or_wifi);
     return;
 };
 
@@ -594,11 +612,11 @@ void app_main()
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
     eth_attach_link_state_cb(wifi_eth_link_state_cb);
-    eth_attach_recv_cb(eth_recieve_cb);
+    eth_attach_recv_cb(eth_receive_cb);
     eth_init();
 
     wifi_init();
-    wifi_attach_recv_cb(wifi_recieve_cb);
+    wifi_attach_recv_cb(wifi_receive_cb);
 
     imu_init();
 

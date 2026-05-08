@@ -306,16 +306,6 @@ int imu_init()
     // second step -> configure UART 921600 bauds
     uart_set_baudrate(UART_NUM, 921600);
 
-    //    // install drivers
-    //    const int uart_buffer_size = BUF_SIZE * 2;
-    //    ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, 0, 10, &uart_queue, 0));
-
-    // interrrupts
-    // uart_disable_tx_intr(UART_NUM);
-    // uart_disable_rx_intr(UART_NUM);
-    // uart_isr_free(UART_NUM);
-    // uart_isr_register(UART_NUM, uart_intr_handle, NULL, ESP_INTR_FLAG_IRAM, &handle_console);
-    // uart_enable_rx_intr(UART_NUM);
     uart_intr_config_t uart_intr = {
         .intr_enable_mask = UART_INTR_RXFIFO_FULL | UART_INTR_RXFIFO_TOUT,
         .rx_timeout_thresh = 3,
@@ -325,18 +315,5 @@ int imu_init()
     ESP_ERROR_CHECK(uart_intr_config(UART_NUM, &uart_intr));
     xTaskCreate(uart_event_task, "uart_event_task", 4096, NULL, 10, NULL);
 
-    // while (0) //for debug
-    // {
-    //     parse_IMU_data();
-    //     printf(" intr_cpt:%d\n", intr_cpt);
-    //     printf("rxbuf:     ");
-    //     print_table(rxbuf, 80);
-    //     printf("rxbuf_imu: ");
-    //     print_table(rxbuf_imu, 80);
-    //     printf("rxbuf_ef:  ");
-    //     print_table(rxbuf_ef, 80);
-    //     print_imu();
-    //     vTaskDelay(300/portTICK_PERIOD_MS);
-    // }
     return 0;
 }

@@ -11,12 +11,6 @@ void (*wifi_recv_cb)(const esp_now_recv_info_t *esp_now_info, const uint8_t *dat
 
 // forward declarations
 
-/**
- * @brief    Send data using ESPNOW
- *
- * @param    data    Pointer to the data to be sent
- * @param    len     Length of the data to be sent
- */
 void wifi_send_data(uint8_t *data, int len)
 {
   esp_err_t ret = esp_now_send(peer.peer_addr, data, len);
@@ -26,12 +20,6 @@ void wifi_send_data(uint8_t *data, int len)
   }
 }
 
-//**
-// * @brief    Execute the recieve callback function
-// *
-// * @param    data    Pointer to the data to be sent
-// * @param    len     Length of the data to be sent
-// */
 void wifi_recv_func(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len)
 {
   if (wifi_recv_cb == NULL)
@@ -43,14 +31,6 @@ void wifi_recv_func(const esp_now_recv_info_t *esp_now_info, const uint8_t *data
     wifi_recv_cb(esp_now_info, data, data_len);
   }
 }
-
-// static void wifi_send_cb(const uint8_t *mac_addr, esp_now_send_status_t status)
-// {
-//   if (status != ESP_OK)
-//   {
-//     ESP_LOGW(WIFI_TAG, "Failed to send data to "MACSTR", status: %d", MAC2STR(mac_addr), status);
-//   }
-// }
 
 void wifi_attach_recv_cb(void (*cb)(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len))
 {

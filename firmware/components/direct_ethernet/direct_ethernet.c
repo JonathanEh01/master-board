@@ -8,7 +8,7 @@ uint8_t eth_src_mac[6] = {0};
 uint8_t eth_dst_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 EventGroupHandle_t udp_event_group = NULL;
-static esp_eth_handle_t eth_handle;
+static esp_eth_handle_t eth_handle = NULL;
 static esp_netif_t *eth_netif = NULL;
 static esp_eth_netif_glue_handle_t eth_glue = NULL;
 static const char *ETH_TAG = "Direct_Ethernet";
@@ -90,7 +90,6 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
 
 static esp_err_t eth_recv_func(esp_eth_handle_t hdl, uint8_t *buffer, uint32_t len, void *priv)
 {
-  // esp_netif_t *netif = (esp_netif_t *)priv;
   eth_frame *frame = (eth_frame *)buffer;
 
   if (len >= sizeof(eth_frame) - CONFIG_MAX_ETH_DATA_LEN &&
@@ -228,9 +227,6 @@ void eth_init()
   IP4_ADDR(&ip_info.ip, ip4_addr1(&ip), ip4_addr2(&ip), ip4_addr3(&ip), ip4_addr4(&ip));
   IP4_ADDR(&ip_info.gw, ip4_addr1(&gw), ip4_addr2(&gw), ip4_addr3(&gw), ip4_addr4(&gw));
   IP4_ADDR(&ip_info.netmask, ip4_addr1(&netmask), ip4_addr2(&netmask), ip4_addr3(&netmask), ip4_addr4(&netmask));
-  // ip4addr_aton(DEVICE_IP, &ip_info.ip);
-  // ip4addr_aton(DEVICE_GW, &ip_info.gw);
-  // ip4addr_aton(DEVICE_NETMASK, &ip_info.netmask);
   ESP_ERROR_CHECK(esp_netif_set_ip_info(eth_netif, &ip_info));
 
   eth_glue = esp_eth_new_netif_glue(eth_handle);
@@ -239,7 +235,7 @@ void eth_init()
   ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, NULL));
 
   // start ethernet driver
-  esp_eth_start(eth_handle); //! ERROR_CHECK(...)
+  esp_eth_start(eth_handle);
 }
 
 void eth_deinit()

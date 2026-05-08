@@ -8,7 +8,7 @@ uint8_t eth_src_mac[6] = {0};
 uint8_t eth_dst_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 EventGroupHandle_t udp_event_group = NULL;
-static esp_eth_handle_t eth_handle = NULL;
+static esp_eth_handle_t eth_handle;
 static esp_netif_t *eth_netif = NULL;
 static esp_eth_netif_glue_handle_t eth_glue = NULL;
 static const char *ETH_TAG = "Direct_Ethernet";
@@ -91,7 +91,7 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
 
 static esp_err_t eth_recv_func(esp_eth_handle_t hdl, uint8_t *buffer, uint32_t len, void *priv)
 {
-    esp_netif_t *netif = (esp_netif_t *)priv;
+    // esp_netif_t *netif = (esp_netif_t *)priv;
     eth_frame *frame = (eth_frame *)buffer;
 
     if (len >= sizeof(eth_frame) - CONFIG_MAX_ETH_DATA_LEN &&
@@ -107,6 +107,7 @@ static esp_err_t eth_recv_func(esp_eth_handle_t hdl, uint8_t *buffer, uint32_t l
       free(buffer);
       return ESP_OK;
     } else {
+      free(buffer);
         ESP_LOGW(ETH_TAG, "Received frame does not meet the expected format or length requirements.");
     }
 
@@ -173,6 +174,18 @@ void eth_init()
 { 
   udp_event_group = xEventGroupCreate();
 
+  // config gpio for 50Hz clock input from phy
+  gpio_config_t io_conf = {
+    .pin_bit_mask = 1ULL << PIN_CLK_50HZ,
+    .mode = GPIO_MODE_INPUT,
+    .pull_up_en = GPIO_PULLUP_DISABLE,
+    .pull_down_en = GPIO_PULLDOWN_DISABLE,
+    .intr_type = GPIO_INTR_DISABLE
+  };
+  ESP_ERROR_CHECK(gpio_config(&io_conf));
+  ESP_ERROR_CHECK(gpio_set_level(PIN_CLK_50HZ, 1));
+  vTaskDelay(pdMS_TO_TICKS(10));
+
   // configure emac
   eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
   eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
@@ -183,13 +196,13 @@ void eth_init()
   
   // configure phy
   eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
-  phy_config.phy_addr = PHY1;
+  phy_config.phy_addr = -1;
   phy_config.reset_gpio_num = -1;
   esp_eth_phy_t *phy = esp_eth_phy_new_lan87xx(&phy_config);
   
   // install driver
   esp_eth_config_t config = ETH_DEFAULT_CONFIG(mac, phy);
-  ESP_ERROR_CHECK(esp_eth_driver_install(&config, &eth_handle));
+  esp_eth_driver_install(&config, &eth_handle);
 
   esp_err_t err = esp_event_loop_create_default();
     if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
@@ -198,24 +211,31 @@ void eth_init()
   ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL));
   
   // connect driver to TCP/IP stack
-  ESP_ERROR_CHECK(esp_netif_init());
+  esp_netif_init();
   esp_netif_config_t cfg = ESP_NETIF_DEFAULT_ETH();
   eth_netif = esp_netif_new(&cfg);
 
   ESP_ERROR_CHECK(esp_netif_dhcpc_stop(eth_netif));
   esp_netif_ip_info_t ip_info;
-  ip4addr_aton(DEVICE_IP, &ip_info.ip);
-  ip4addr_aton(DEVICE_GW, &ip_info.gw);
-  ip4addr_aton(DEVICE_NETMASK, &ip_info.netmask);
+  esp_ip4_addr_t ip, gw, netmask;
+  ESP_ERROR_CHECK(esp_netif_str_to_ip4(DEVICE_IP, &ip));
+  ESP_ERROR_CHECK(esp_netif_str_to_ip4(DEVICE_GW, &gw));
+  ESP_ERROR_CHECK(esp_netif_str_to_ip4(DEVICE_NETMASK, &netmask));
+  IP4_ADDR(&ip_info.ip, ip4_addr1(&ip), ip4_addr2(&ip), ip4_addr3(&ip), ip4_addr4(&ip));
+  IP4_ADDR(&ip_info.gw, ip4_addr1(&gw), ip4_addr2(&gw), ip4_addr3(&gw), ip4_addr4(&gw));
+  IP4_ADDR(&ip_info.netmask, ip4_addr1(&netmask), ip4_addr2(&netmask), ip4_addr3(&netmask), ip4_addr4(&netmask));
+  // ip4addr_aton(DEVICE_IP, &ip_info.ip);
+  // ip4addr_aton(DEVICE_GW, &ip_info.gw);
+  // ip4addr_aton(DEVICE_NETMASK, &ip_info.netmask);
   ESP_ERROR_CHECK(esp_netif_set_ip_info(eth_netif, &ip_info));
 
   eth_glue = esp_eth_new_netif_glue(eth_handle);
   ESP_ERROR_CHECK(esp_netif_attach(eth_netif, eth_glue));
-  ESP_ERROR_CHECK(esp_eth_update_input_path(eth_handle, eth_recv_func, eth_netif));
+  esp_eth_update_input_path(eth_handle, eth_recv_func, eth_netif);
   ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, NULL));
 
   // start ethernet driver
-  ESP_ERROR_CHECK(esp_eth_start(eth_handle));
+  esp_eth_start(eth_handle); //! ERROR_CHECK(...)
 }
 
 void eth_deinit()

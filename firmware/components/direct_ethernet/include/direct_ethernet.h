@@ -12,12 +12,14 @@
 #include "esp_log.h"
 #include "esp_eth.h"
 #include "esp_netif.h"
+#include "driver/gpio.h"
 
 #include "esp_eth_phy_lan87xx.h"
 
 #define CONFIG_PHY_CLOCK_MODE EMAC_CLK_EXT_IN
-#define PIN_SMI_MDC 23
-#define PIN_SMI_MDIO 18
+#define PIN_SMI_MDC GPIO_NUM_23
+#define PIN_SMI_MDIO GPIO_NUM_18
+#define PIN_CLK_50HZ GPIO_NUM_17
 
 #define DEVICE_IP "192.168.1.0"
 #define DEVICE_NETMASK "255.255.255.0"

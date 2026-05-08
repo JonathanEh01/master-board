@@ -84,7 +84,6 @@ bool CRC_check(uint8_t *bytes, int len) {
     return (CRC_compute(bytes, len) == 0);
 }
 
-
 uint16_t crc16_ccitt(uint8_t * data, int len)
 {
     uint16_t crc = 0xFFFF;

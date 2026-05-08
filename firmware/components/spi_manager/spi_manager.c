@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "spi_manager.h"
+#include "esp_attr.h"
 
 // type definitions
 typedef struct {
@@ -53,7 +54,7 @@ void spi_init() {
         .quadhd_io_num = -1,
         .max_transfer_sz = SPI_TOTAL_LEN * 2
     };
-    ESP_ERROR_CHECK(spi_bus_initialize(HSPI_HOST, &bus_config, SPI_DMA_DISABLED));
+    ESP_ERROR_CHECK(spi_bus_initialize(SPI2_HOST, &bus_config, SPI_DMA_DISABLED));
 
     // add device
     spi_device_interface_config_t dev_config = {
@@ -64,7 +65,7 @@ void spi_init() {
         .pre_cb=spi_pre_transfer_callback,
         .post_cb=spi_post_transfer_callback,
     };
-    ESP_ERROR_CHECK(spi_bus_add_device(HSPI_HOST, &dev_config, &spi));
+    ESP_ERROR_CHECK(spi_bus_add_device(SPI2_HOST, &dev_config, &spi));
 }
 
 bool spi_send(int slave, uint8_t *tx_data, uint8_t *rx_data, int len) {

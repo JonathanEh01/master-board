@@ -1,5 +1,5 @@
-#ifndef WS2812_LED_CONTROL_H
-#define WS2812_LED_CONTROL_H
+#ifndef WS2812B_LED_H
+#define WS2812B_LED_H
 #include <stdint.h>
 
 #ifndef NUM_LEDS

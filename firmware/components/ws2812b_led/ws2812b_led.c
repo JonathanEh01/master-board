@@ -1,7 +1,8 @@
-#include "ws2812_led.h"
+#include "ws2812b_led.h"
 #include "driver/rmt_tx.h"
 #include "driver/rmt_common.h"
 #include "hal/rmt_types.h"
+#include "freertos/FreeRTOS.h"
 
 // Configure these based on your project needs ********
 #define LED_RMT_TX_CHANNEL RMT_CHANNEL_0
@@ -27,7 +28,7 @@ static void setup_rmt_data_buffer(struct led_state new_state);
 
 void ws2812_control_init(void)
 {
-  rmt_copy_encoder_config_t copy_encoder_config = {0};
+  rmt_copy_encoder_config_t copy_encoder_config = {};
   ESP_ERROR_CHECK(rmt_new_copy_encoder(&copy_encoder_config, &rmt_encoder_handle));
 
   rmt_tx_channel_config_t tx_channel_config = {
@@ -75,7 +76,7 @@ void setup_rmt_data_buffer(struct led_state new_state)
             .duration1 = TL,
         } : 
         (rmt_symbol_word_t){
-            .level0 = 0,
+            .level0 = 1,
             .duration0 = T0H,
             .level1 = 0,
             .duration1 = TL,

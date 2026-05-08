@@ -69,9 +69,10 @@ struct wifi_eth_packet_ack wifi_eth_tx_ack;
 struct wifi_eth_packet_command wifi_eth_rx_cmd_reader_buffer;
 QueueHandle_t wifi_eth_rx_cmd_mailbox;
 
-bool send_zero_cmd = true; //If true, all cmd packet sent to udrivers ar set to 0.
+bool send_zero_cmd = true; // If true, all cmd packet sent to udrivers ar set to 0.
 
-bool use_wifi() {
+bool use_wifi()
+{
     return eth_or_wifi_flag == 'w';
 }
 
@@ -122,7 +123,7 @@ static void periodic_timer_callback(void *arg)
             spi_count = 0;
 
             spi_autodetect = true;
-            spi_n_attempt = 1;  // we only test each slave once while autodetecting
+            spi_n_attempt = 1; // we only test each slave once while autodetecting
             break;
 
         case SENDING_INIT_ACK:
@@ -170,7 +171,7 @@ static void periodic_timer_callback(void *arg)
     switch (current_state)
     {
     case WAITING_FOR_INIT:
-        set_all_leds(RGB(0xff * fade_blink, 0, 0)); //Red fade, Waiting for init
+        set_all_leds(RGB(0xff * fade_blink, 0, 0)); // Red fade, Waiting for init
 
         // Change wifi channel to find the one used by the computer
         if ((ms_cpt % 100) == 0 && next_state == current_state)
@@ -183,7 +184,7 @@ static void periodic_timer_callback(void *arg)
         break;
 
     case SPI_AUTODETECT:
-        set_all_leds(RGB(0xff * fade_blink, 0, 0xff * fade_blink)); //Magenta fade, SPI Autodetect
+        set_all_leds(RGB(0xff * fade_blink, 0, 0xff * fade_blink)); // Magenta fade, SPI Autodetect
 
         if (spi_count > SPI_AUTODETECT_MAX_COUNT)
         {
@@ -194,7 +195,7 @@ static void periodic_timer_callback(void *arg)
         break;
 
     case SENDING_INIT_ACK:
-        set_all_leds(RGB(0, 0, 0xff * fade_blink)); //Blue fade, waiting for first commmand
+        set_all_leds(RGB(0, 0, 0xff * fade_blink)); // Blue fade, waiting for first commmand
 
         if (wifi_eth_count > CONFIG_WIFI_ETH_TIMEOUT_ACK)
         {
@@ -205,7 +206,7 @@ static void periodic_timer_callback(void *arg)
         break;
 
     case ACTIVE_CONTROL:
-        set_all_leds(RGB(0, 0xff * fade_blink, 0)); //Green fade, Active control
+        set_all_leds(RGB(0, 0xff * fade_blink, 0)); // Green fade, Active control
 
         if (wifi_eth_count > CONFIG_WIFI_ETH_TIMEOUT_CONTROL)
         {
@@ -217,7 +218,7 @@ static void periodic_timer_callback(void *arg)
             // Read command message in a RTOS mailbox for thread safe comunication */
             if (!xQueuePeek(wifi_eth_rx_cmd_mailbox, &wifi_eth_rx_cmd_reader_buffer, 0))
             {
-                send_zero_cmd = true; //mailbox is empty -> we never got a command packet
+                send_zero_cmd = true; // mailbox is empty -> we never got a command packet
             }
         }
 
@@ -258,16 +259,15 @@ static void periodic_timer_callback(void *arg)
 
             printf("[%d] sent : %ld, ok : %ld, ratio : %.02f\n", i, spi_count, spi_ok[i], 100. * spi_ok[i] / spi_count);
         }
-        //print_imu();
+        // print_imu();
         printf("\nlast CMD packet:\n");
         print_packet(spi_tx_packet[2], SPI_TOTAL_LEN * 2);
     }
 
-
     /* Prepare the outgoing spi TX packet */
     for (int i = 0; i < CONFIG_N_SLAVES; i++)
     {
-        //printf("%d\n",send_zero_cmd);
+        // printf("%d\n",send_zero_cmd);
         if (!TEST_BIT(spi_connected, i) && !spi_autodetect)
             continue; // ignoring this slave if it is not connected
 
@@ -288,7 +288,7 @@ static void periodic_timer_callback(void *arg)
         }
         else
         {
-            SPI_REG_u16(spi_tx_packet[i], SPI_COMMAND_MODE) = SPI_SWAP_DATA_TX(1<<15, 16); //In case of zero commands, keep the system enabled
+            SPI_REG_u16(spi_tx_packet[i], SPI_COMMAND_MODE) = SPI_SWAP_DATA_TX(1 << 15, 16); // In case of zero commands, keep the system enabled
             SPI_REG_32(spi_tx_packet[i], SPI_COMMAND_POS_1) = 0;
             SPI_REG_32(spi_tx_packet[i], SPI_COMMAND_POS_2) = 0;
             SPI_REG_16(spi_tx_packet[i], SPI_COMMAND_VEL_1) = 0;
@@ -311,17 +311,17 @@ static void periodic_timer_callback(void *arg)
         for (int i = 0; i < CONFIG_N_SLAVES; i++)
         {
             if (!TEST_BIT(spi_connected, i) && !spi_autodetect)
-                continue;  // ignoring this slave if it is not connected
+                continue; // ignoring this slave if it is not connected
 
             if (spi_done[i])
-                continue;  // ignoring this slave if the transaction has already been done
-            
+                continue; // ignoring this slave if the transaction has already been done
+
             spi_send(i, (uint8_t *)spi_tx_packet[i], (uint8_t *)spi_rx_packet[i], SPI_TOTAL_LEN * 2);
 
             // checking if data is correct
             if (packet_check_CRC(spi_rx_packet[i]))
             {
-                spi_connected |= (1 << i);  // noting that this slave is connected and working properly
+                spi_connected |= (1 << i); // noting that this slave is connected and working properly
                 spi_done[i] = true;
                 spi_ok[i]++;
 
@@ -351,25 +351,24 @@ static void periodic_timer_callback(void *arg)
             {
                 // zeroing sensor data in packet, except the status field
                 memset(&(wifi_eth_tx_data.sensor[i]), 0, sizeof(struct sensor_data));
-                wifi_eth_tx_data.sensor[i].status = 0xf;  // specifying that the transaction failed in the sensor packet
+                wifi_eth_tx_data.sensor[i].status = 0xf; // specifying that the transaction failed in the sensor packet
             }
         }
         // Slave 7 is always the power board
-        
-        uint8_t tx_spi_powerboard[12] = {0xaa,0xbb,0xcc,0xdd,0xee,0xff,0xaa,0xbb,0xcc,0xdd,0xee,0xff}; //Fake packet, cmd to the power board are not yet implemented
+
+        uint8_t tx_spi_powerboard[12] = {0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}; // Fake packet, cmd to the power board are not yet implemented
         uint8_t rx_spi_powerboard[12] = {0};
-        spi_send(7, tx_spi_powerboard,rx_spi_powerboard, 12);
-        if (crc16_ccitt_check(rx_spi_powerboard,12))  // Packet valid?
+        spi_send(7, tx_spi_powerboard, rx_spi_powerboard, 12);
+        if (crc16_ccitt_check(rx_spi_powerboard, 12)) // Packet valid?
         {
-            wifi_eth_tx_data.powerboard.vbus = (rx_spi_powerboard[2]<<8) | rx_spi_powerboard[3];
-            wifi_eth_tx_data.powerboard.vshunt = (rx_spi_powerboard[4]<<8) | rx_spi_powerboard[5];
+            wifi_eth_tx_data.powerboard.vbus = (rx_spi_powerboard[2] << 8) | rx_spi_powerboard[3];
+            wifi_eth_tx_data.powerboard.vshunt = (rx_spi_powerboard[4] << 8) | rx_spi_powerboard[5];
             union floatbytes fb;
             fb.b[3] = rx_spi_powerboard[6];
             fb.b[2] = rx_spi_powerboard[7];
             fb.b[1] = rx_spi_powerboard[8];
             fb.b[0] = rx_spi_powerboard[9];
             wifi_eth_tx_data.powerboard.energy = fb.f;
-            
         }
     }
 
@@ -466,17 +465,18 @@ bool check_command_msg(const int data_len)
     return (data_len == sizeof(struct wifi_eth_packet_command)) && (current_state == SENDING_INIT_ACK || current_state == ACTIVE_CONTROL);
 };
 
-void recieve_cb(uint8_t src_mac[6], uint8_t *data, int data_len, char eth_or_wifi) {
+void recieve_cb(uint8_t src_mac[6], uint8_t *data, int data_len, char eth_or_wifi)
+{
     eth_or_wifi_flag = eth_or_wifi;
     if (check_init_msg(data_len))
     {
         struct wifi_eth_packet_init *packet_recv = (struct wifi_eth_packet_init *)data;
-        
+
         if (packet_recv->protocol_version != PROTOCOL_VERSION)
         {
             wifi_eth_tx_ack.protocol_version = PROTOCOL_VERSION;
             wifi_eth_tx_ack.session_id = packet_recv->session_id;
-            
+
             if (use_wifi())
             {
                 wifi_send_data((uint8_t *)&wifi_eth_tx_ack, sizeof(struct wifi_eth_packet_ack));
@@ -485,21 +485,21 @@ void recieve_cb(uint8_t src_mac[6], uint8_t *data, int data_len, char eth_or_wif
             {
                 eth_send_data((uint8_t *)&wifi_eth_tx_ack, sizeof(struct wifi_eth_packet_ack));
             }
-            
+
             ESP_LOGW("", "Wrong protocol version, got %d instead of %d, ignoring init packet.", packet_recv->protocol_version, PROTOCOL_VERSION);
             return; // ignoring packet
         }
-        
+
         if (current_state == WAITING_FOR_INIT)
         {
             // use_wifi() = (eth_or_wifi == 'w');
-            
+
             // if wifi is used, ethernet is deinitialized (eth stopped and driver uninstalled)
             // we avoid deinitializing ethernet if it has already been
             if (next_state == current_state)
             {
                 next_state = SPI_AUTODETECT; // state transition before deinit for safety
-                
+
                 if (use_wifi())
                 {
                     eth_deinit();
@@ -510,51 +510,53 @@ void recieve_cb(uint8_t src_mac[6], uint8_t *data, int data_len, char eth_or_wif
                 }
             }
         }
-        
+
         session_id = packet_recv->session_id; // set session id
         next_state = SPI_AUTODETECT;          // state transition
-        
+
         // reset count for communication timeout
         wifi_eth_count = 0;
     }
     else if (check_command_msg(data_len))
     {
         struct wifi_eth_packet_command *packet_recv = (struct wifi_eth_packet_command *)data;
-        
+
         if (packet_recv->session_id != session_id)
         {
-            //printf("Wrong session id, got %d instead of %d, ignoring packet\n", packet_recv->session_id, session_id);
+            // printf("Wrong session id, got %d instead of %d, ignoring packet\n", packet_recv->session_id, session_id);
             return; // ignoring packet
         }
-        
+
         if (current_state == SENDING_INIT_ACK)
         {
             next_state = ACTIVE_CONTROL; // state transition
             command_index_prev = packet_recv->command_index - 1;
         }
-        
+
         /* Write command message in a RTOS mailbox for thread safe comunication */
-        xQueueOverwrite( wifi_eth_rx_cmd_mailbox, packet_recv );
-        
+        xQueueOverwrite(wifi_eth_rx_cmd_mailbox, packet_recv);
+
         /* Compute data for next wifi_eth_sensor packet */
         wifi_eth_tx_data.packet_loss += ((struct wifi_eth_packet_command *)data)->command_index - command_index_prev - 1;
         wifi_eth_tx_data.last_cmd_index = ((struct wifi_eth_packet_command *)data)->command_index;
         command_index_prev = ((struct wifi_eth_packet_command *)data)->command_index;
-        
+
         // reset count for communication timeout
         wifi_eth_count = 0;
     }
     return;
 };
 
-void wifi_recieve_cb(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len) {
+void wifi_recieve_cb(const esp_now_recv_info_t *esp_now_info, const uint8_t *data, int data_len)
+{
     uint8_t src_mac[6];
     memcpy(src_mac, esp_now_info->src_addr, 6);
     recieve_cb(src_mac, (uint8_t *)data, data_len, 'w');
     return;
 };
 
-void eth_recieve_cb(uint8_t src_mac[6], uint8_t *data, int len, char eth_or_wifi) {
+void eth_recieve_cb(uint8_t src_mac[6], uint8_t *data, int len, char eth_or_wifi)
+{
     recieve_cb(src_mac, data, len, eth_or_wifi);
     return;
 };
@@ -563,7 +565,7 @@ void wifi_eth_link_state_cb(bool new_state)
 {
     // In WAITING_FOR_INIT, we don't know if wifi or ethernet is used
     // so we are ignoring any eth link state changes
-    if (current_state == WAITING_FOR_INIT) 
+    if (current_state == WAITING_FOR_INIT)
         return;
 
     // When wifi is used, ethernet link state doesn't matter
@@ -572,15 +574,15 @@ void wifi_eth_link_state_cb(bool new_state)
 }
 
 void app_main()
-{   
+{
     uart_set_baudrate(UART_NUM_0, 2000000);
     nvs_flash_init();
-    wifi_eth_rx_cmd_mailbox = xQueueCreate( 1, sizeof(struct wifi_eth_packet_command));
-    ws2812_control_init();  // init the LEDs
+    wifi_eth_rx_cmd_mailbox = xQueueCreate(1, sizeof(struct wifi_eth_packet_command));
+    ws2812_control_init(); // init the LEDs
     set_all_leds(0x0f0f0f);
     ws2812_write_leds(ws_led);
 
-    //printf("The core is : %d\n",xPortGetCoreID());
+    // printf("The core is : %d\n",xPortGetCoreID());
     printf("ETH/WIFI init size %u\n", sizeof(struct wifi_eth_packet_init));
     printf("ETH/WIFI command size %u\n", sizeof(struct wifi_eth_packet_command));
     printf("ETH/WIFI ack size %u\n", sizeof(struct wifi_eth_packet_ack));
@@ -594,7 +596,7 @@ void app_main()
     eth_attach_link_state_cb(wifi_eth_link_state_cb);
     eth_attach_recv_cb(eth_recieve_cb);
     eth_init();
-    
+
     wifi_init();
     wifi_attach_recv_cb(wifi_recieve_cb);
 

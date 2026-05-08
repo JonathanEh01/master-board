@@ -19,11 +19,10 @@ void (*eth_link_state_cb)(bool link_state) = NULL;
 
 // forward declarations
 static void eth_event_handler(
-    void* arg, 
-    esp_event_base_t event_base, 
-    int32_t event_id, 
-    void *event_data
-)
+    void *arg,
+    esp_event_base_t event_base,
+    int32_t event_id,
+    void *event_data)
 {
   esp_eth_handle_t local_eth_handle = *(esp_eth_handle_t *)event_data;
 
@@ -42,7 +41,7 @@ static void eth_event_handler(
     ESP_ERROR_CHECK(esp_eth_ioctl(local_eth_handle, ETH_CMD_G_MAC_ADDR, eth_src_mac));
     ESP_LOGI(ETH_TAG, "Ethernet Link Up");
     ESP_LOGI(ETH_TAG, "Ethernet HW Addr %02x:%02x:%02x:%02x:%02x:%02x",
-             eth_src_mac[0], eth_src_mac[1], eth_src_mac[2], 
+             eth_src_mac[0], eth_src_mac[1], eth_src_mac[2],
              eth_src_mac[3], eth_src_mac[4], eth_src_mac[5]);
     break;
 
@@ -74,44 +73,49 @@ static void eth_event_handler(
 }
 
 static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
-                            int32_t event_id, void *event_data)
+                                 int32_t event_id, void *event_data)
 {
-    ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-    const esp_netif_ip_info_t *ip_info = &event->ip_info;
+  ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+  const esp_netif_ip_info_t *ip_info = &event->ip_info;
 
-    ESP_LOGI(ETH_TAG, "Ethernet got IP");
-    ESP_LOGI(ETH_TAG, "~~~~~~~~~~~");
-    ESP_LOGI(ETH_TAG, "ETHIP:" IPSTR, IP2STR(&ip_info->ip));
-    ESP_LOGI(ETH_TAG, "ETHMASK:" IPSTR, IP2STR(&ip_info->netmask));
-    ESP_LOGI(ETH_TAG, "ETHGW:" IPSTR, IP2STR(&ip_info->gw));
-    ESP_LOGI(ETH_TAG, "~~~~~~~~~~~");
+  ESP_LOGI(ETH_TAG, "Ethernet got IP");
+  ESP_LOGI(ETH_TAG, "~~~~~~~~~~~");
+  ESP_LOGI(ETH_TAG, "ETHIP:" IPSTR, IP2STR(&ip_info->ip));
+  ESP_LOGI(ETH_TAG, "ETHMASK:" IPSTR, IP2STR(&ip_info->netmask));
+  ESP_LOGI(ETH_TAG, "ETHGW:" IPSTR, IP2STR(&ip_info->gw));
+  ESP_LOGI(ETH_TAG, "~~~~~~~~~~~");
 
-    xEventGroupSetBits(udp_event_group, WIFI_CONNECTED_BIT);
+  xEventGroupSetBits(udp_event_group, WIFI_CONNECTED_BIT);
 }
 
 static esp_err_t eth_recv_func(esp_eth_handle_t hdl, uint8_t *buffer, uint32_t len, void *priv)
 {
-    // esp_netif_t *netif = (esp_netif_t *)priv;
-    eth_frame *frame = (eth_frame *)buffer;
+  // esp_netif_t *netif = (esp_netif_t *)priv;
+  eth_frame *frame = (eth_frame *)buffer;
 
-    if (len >= sizeof(eth_frame) - CONFIG_MAX_ETH_DATA_LEN &&
+  if (len >= sizeof(eth_frame) - CONFIG_MAX_ETH_DATA_LEN &&
       len <= sizeof(eth_frame) &&
       frame->ethertype == ETHERTYPE &&
       frame->data_len <= len - sizeof(eth_frame) + CONFIG_MAX_ETH_DATA_LEN)
+  {
+    if (eth_recv_cb != NULL)
     {
-      if (eth_recv_cb != NULL) {
-        eth_recv_cb(frame->src_mac, frame->data, frame->data_len, 'e');
-      } else {
-        ESP_LOGW(ETH_TAG, "Ethernet frame received but no callback function is set on received...");
-      }
-      free(buffer);
-      return ESP_OK;
-    } else {
-      free(buffer);
-        ESP_LOGW(ETH_TAG, "Received frame does not meet the expected format or length requirements.");
+      eth_recv_cb(frame->src_mac, frame->data, frame->data_len, 'e');
     }
-
+    else
+    {
+      ESP_LOGW(ETH_TAG, "Ethernet frame received but no callback function is set on received...");
+    }
+    free(buffer);
     return ESP_OK;
+  }
+  else
+  {
+    free(buffer);
+    ESP_LOGW(ETH_TAG, "Received frame does not meet the expected format or length requirements.");
+  }
+
+  return ESP_OK;
 }
 
 void eth_init_frame(eth_frame *p_frame)
@@ -123,22 +127,22 @@ void eth_init_frame(eth_frame *p_frame)
 
 esp_err_t eth_send_frame(eth_frame *p_frame)
 {
-    esp_err_t ret;
+  esp_err_t ret;
 
-    if (eth_handle == NULL)
-    {
-        ESP_LOGE(ETH_TAG, "Ethernet not initialized");
-        return ESP_FAIL;
-    }
+  if (eth_handle == NULL)
+  {
+    ESP_LOGE(ETH_TAG, "Ethernet not initialized");
+    return ESP_FAIL;
+  }
 
-    ret = esp_eth_transmit(eth_handle, (void *)p_frame, sizeof(eth_frame) + (p_frame->data_len) - CONFIG_MAX_ETH_DATA_LEN);
-    if (ret != ESP_OK)
-    {
-        ESP_LOGE(ETH_TAG, "Error occurred while sending eth frame: error code 0x%x", ret);
-        return ESP_FAIL;
-    }
+  ret = esp_eth_transmit(eth_handle, (void *)p_frame, sizeof(eth_frame) + (p_frame->data_len) - CONFIG_MAX_ETH_DATA_LEN);
+  if (ret != ESP_OK)
+  {
+    ESP_LOGE(ETH_TAG, "Error occurred while sending eth frame: error code 0x%x", ret);
+    return ESP_FAIL;
+  }
 
-    return ESP_OK;
+  return ESP_OK;
 }
 
 void eth_send_data(uint8_t *data, int len)
@@ -171,17 +175,16 @@ void eth_attach_link_state_cb(void (*cb)(bool link_state))
 }
 
 void eth_init()
-{ 
+{
   udp_event_group = xEventGroupCreate();
 
   // config gpio for 50Hz clock input from phy
   gpio_config_t io_conf = {
-    .pin_bit_mask = 1ULL << PIN_CLK_50HZ,
-    .mode = GPIO_MODE_INPUT,
-    .pull_up_en = GPIO_PULLUP_DISABLE,
-    .pull_down_en = GPIO_PULLDOWN_DISABLE,
-    .intr_type = GPIO_INTR_DISABLE
-  };
+      .pin_bit_mask = 1ULL << PIN_CLK_50HZ,
+      .mode = GPIO_MODE_INPUT,
+      .pull_up_en = GPIO_PULLUP_DISABLE,
+      .pull_down_en = GPIO_PULLDOWN_DISABLE,
+      .intr_type = GPIO_INTR_DISABLE};
   ESP_ERROR_CHECK(gpio_config(&io_conf));
   ESP_ERROR_CHECK(gpio_set_level(PIN_CLK_50HZ, 1));
   vTaskDelay(pdMS_TO_TICKS(10));
@@ -189,27 +192,28 @@ void eth_init()
   // configure emac
   eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
   eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
-  esp32_emac_config.smi_gpio.mdc_num = PIN_SMI_MDC; 
+  esp32_emac_config.smi_gpio.mdc_num = PIN_SMI_MDC;
   esp32_emac_config.smi_gpio.mdio_num = PIN_SMI_MDIO;
   esp32_emac_config.clock_config.rmii.clock_mode = CONFIG_PHY_CLOCK_MODE;
-  esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config); 
-  
+  esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
+
   // configure phy
   eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
   phy_config.phy_addr = -1;
   phy_config.reset_gpio_num = -1;
   esp_eth_phy_t *phy = esp_eth_phy_new_lan87xx(&phy_config);
-  
+
   // install driver
   esp_eth_config_t config = ETH_DEFAULT_CONFIG(mac, phy);
   esp_eth_driver_install(&config, &eth_handle);
 
   esp_err_t err = esp_event_loop_create_default();
-    if (err != ESP_OK && err != ESP_ERR_INVALID_STATE) {
-        ESP_ERROR_CHECK(err);
-    }
+  if (err != ESP_OK && err != ESP_ERR_INVALID_STATE)
+  {
+    ESP_ERROR_CHECK(err);
+  }
   ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler, NULL));
-  
+
   // connect driver to TCP/IP stack
   esp_netif_init();
   esp_netif_config_t cfg = ESP_NETIF_DEFAULT_ETH();
@@ -240,24 +244,28 @@ void eth_init()
 
 void eth_deinit()
 {
-    if (eth_handle != NULL) {
-        ESP_ERROR_CHECK(esp_eth_stop(eth_handle));
-        ESP_ERROR_CHECK(esp_eth_driver_uninstall(eth_handle));
-        eth_handle = NULL;
-    }
+  if (eth_handle != NULL)
+  {
+    ESP_ERROR_CHECK(esp_eth_stop(eth_handle));
+    ESP_ERROR_CHECK(esp_eth_driver_uninstall(eth_handle));
+    eth_handle = NULL;
+  }
 
-    if (eth_glue != NULL) {
-        esp_eth_del_netif_glue(eth_glue);
-        eth_glue = NULL;
-    }
+  if (eth_glue != NULL)
+  {
+    esp_eth_del_netif_glue(eth_glue);
+    eth_glue = NULL;
+  }
 
-    if (eth_netif != NULL) {
-        esp_netif_destroy(eth_netif);
-        eth_netif = NULL;
-    }
+  if (eth_netif != NULL)
+  {
+    esp_netif_destroy(eth_netif);
+    eth_netif = NULL;
+  }
 
-    if (udp_event_group != NULL) {
-        vEventGroupDelete(udp_event_group);
-        udp_event_group = NULL;
-    }
+  if (udp_event_group != NULL)
+  {
+    vEventGroupDelete(udp_event_group);
+    udp_event_group = NULL;
+  }
 }

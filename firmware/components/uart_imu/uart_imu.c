@@ -63,9 +63,9 @@ struct strcut_imu_data imu = {0};
 static QueueHandle_t uart_queue;
 
 // Receive buffer to collect incoming data
-uint8_t rxbuf[128] = {0};     //default buffer
-uint8_t rxbuf_imu[128] = {0}; //buffer for  IMU packets
-uint8_t rxbuf_ef[128] = {0};  //buffer for estimation filter packets
+uint8_t rxbuf[128] = {0};     // default buffer
+uint8_t rxbuf_imu[128] = {0}; // buffer for  IMU packets
+uint8_t rxbuf_ef[128] = {0};  // buffer for estimation filter packets
 
 // Define mailbox for thread safe exchange between interupt and main loop
 QueueHandle_t imu_mailbox;
@@ -75,32 +75,35 @@ int intr_cpt = 0;
 uint8_t read_index_imu = 0; // where to read the latest updated imu data
 uint8_t read_index_ef = 0;  // where to read the latest updated ef data
 
-
 // forward declarations
 
 static void process_uart_bytes(const uint8_t *rxbuf, size_t rx_fifo_len)
 {
     size_t i = 0;
 
-    while ((i + 4) < rx_fifo_len) {
-        if (rxbuf[i] != 0x75 || rxbuf[i + 1] != 0x65) {
+    while ((i + 4) < rx_fifo_len)
+    {
+        if (rxbuf[i] != 0x75 || rxbuf[i + 1] != 0x65)
+        {
             ESP_LOGW(UART_TAG, "The data doesn't look like the expected header");
             break;
         }
 
         // header strucure: [0x75 - 0x65 - descriptor - payload_len]
         int size = rxbuf[i + 3] + 2 + 4;
-        if ((size_t)size > (rx_fifo_len - i)) {
+        if ((size_t)size > (rx_fifo_len - i))
+        {
             ESP_LOGW(UART_TAG, "Data length mismatch.");
             break;
         }
 
-        switch (rxbuf[i + 2]) {
-        case 0x80:   // IMU descriptor
+        switch (rxbuf[i + 2])
+        {
+        case 0x80: // IMU descriptor
             xQueueOverwrite(imu_mailbox, &rxbuf[i]);
             break;
 
-        case 0x82:   // EF descriptor
+        case 0x82: // EF descriptor
             xQueueOverwrite(ef_mailbox, &rxbuf[i]);
             break;
 
@@ -117,15 +120,20 @@ static void uart_event_task(void *arg)
     uart_event_t event;
     uint8_t rxbuf[512];
 
-    while (true) {
-        if (xQueueReceive(uart_queue, &event, portMAX_DELAY)) {
-            switch (event.type) {
-            case UART_DATA: {
+    while (true)
+    {
+        if (xQueueReceive(uart_queue, &event, portMAX_DELAY))
+        {
+            switch (event.type)
+            {
+            case UART_DATA:
+            {
                 int len = uart_read_bytes(UART_NUM,
                                           rxbuf,
                                           event.size < sizeof(rxbuf) ? event.size : sizeof(rxbuf),
                                           0);
-                if (len > 0) {
+                if (len > 0)
+                {
                     intr_cpt++;
                     process_uart_bytes(rxbuf, (size_t)len);
                 }
@@ -249,16 +257,15 @@ int imu_init()
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE
-    };
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE};
     ESP_ERROR_CHECK(uart_param_config(UART_NUM, &uart_config));
-    
+
     // set communication pins
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, PIN_TXD, PIN_RXD, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
     // install drivers
-   const int uart_buffer_size = BUF_SIZE * 2;
-   ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, 0, 10, &uart_queue, 0));
+    const int uart_buffer_size = BUF_SIZE * 2;
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, 0, 10, &uart_queue, 0));
     /*
     75 65 01 02 02 02 E1 C7                           // Put the Device in Idle Mode
     75 65 0C 0A 0A 08 01 02 04 00 01 05 00 01 10 73   // IMU data: acc+gyr at 1000Hz
@@ -268,50 +275,50 @@ int imu_init()
     75 65 0D 06 06 03 00 00 00 00 F6 E4               // set heading at 0
     75 65 01 02 02 06 E5 CB                           // Resume the Device (is it needed?)
     */
-   const char cmd0[8] = {0x75, 0x65, 0x01, 0x02, 0x02, 0x02, 0xE1, 0xC7};                                                  // Put the Device in Idle Mode
-   const char cmd1[16] = {0x75, 0x65, 0x0C, 0x0A, 0x0A, 0x08, 0x01, 0x02, 0x04, 0x00, 0x01, 0x05, 0x00, 0x01, 0x10, 0x73}; // IMU data: acc+gyr at 1000Hz
-   const char cmd2[16] = {0x75, 0x65, 0x0C, 0x0A, 0x0A, 0x0A, 0x01, 0x02, 0x05, 0x00, 0x01, 0x0D, 0x00, 0x01, 0x1b, 0xa3}; // EF data: RPY + LinACC at 500Hz (max)
-   const char cmd3[16] = {0x75, 0x65, 0x0C, 0x0A, 0x05, 0x11, 0x01, 0x01, 0x01, 0x05, 0x11, 0x01, 0x03, 0x01, 0x24, 0xCC}; // Enable the data stream for IMU and EF
-   const char cmd4[12] = {0x75, 0x65, 0x0D, 0x06, 0x06, 0x03, 0x00, 0x00, 0x00, 0x00, 0xF6, 0xE4};                         // set heading at 0
-   const char cmd5[8] = {0x75, 0x65, 0x01, 0x02, 0x02, 0x06, 0xE5, 0xCB};                                                  // Resume the Device
-   const char cmd6[13] = {0x75, 0x65, 0x0C, 0x07, 0x07, 0x40, 0x01, 0x00, 0x0E, 0x10, 0x00, 0x53, 0x9D};                   // 921600 bauds
-   
-   //Let the IMU some time to boot
-   //! To-Do: read uart and wait for IMU acknoledgment on cmd0 to optimize boot time and/or detect the absence of IMU
-   vTaskDelay(100 / portTICK_PERIOD_MS);
-   
-   // send commands
-   uart_write_bytes(UART_NUM, cmd0, 8);
-   vTaskDelay(3);
-   uart_write_bytes(UART_NUM, cmd1, 16);
-   vTaskDelay(3);
-   uart_write_bytes(UART_NUM, cmd2, 16);
-   vTaskDelay(3);
-   uart_write_bytes(UART_NUM, cmd3, sizeof(cmd3));
-   vTaskDelay(3);
-   uart_write_bytes(UART_NUM, cmd4, sizeof(cmd4));
-   vTaskDelay(3);
-   uart_write_bytes(UART_NUM, cmd5, sizeof(cmd5));
-   vTaskDelay(3);
-   uart_write_bytes(UART_NUM, cmd6, sizeof(cmd6));
-   vTaskDelay(3);
-   
-   // second step -> configure UART 921600 bauds
-   uart_set_baudrate(UART_NUM, 921600);
-   
-//    // install drivers
-//    const int uart_buffer_size = BUF_SIZE * 2;
-//    ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, 0, 10, &uart_queue, 0));
+    const char cmd0[8] = {0x75, 0x65, 0x01, 0x02, 0x02, 0x02, 0xE1, 0xC7};                                                  // Put the Device in Idle Mode
+    const char cmd1[16] = {0x75, 0x65, 0x0C, 0x0A, 0x0A, 0x08, 0x01, 0x02, 0x04, 0x00, 0x01, 0x05, 0x00, 0x01, 0x10, 0x73}; // IMU data: acc+gyr at 1000Hz
+    const char cmd2[16] = {0x75, 0x65, 0x0C, 0x0A, 0x0A, 0x0A, 0x01, 0x02, 0x05, 0x00, 0x01, 0x0D, 0x00, 0x01, 0x1b, 0xa3}; // EF data: RPY + LinACC at 500Hz (max)
+    const char cmd3[16] = {0x75, 0x65, 0x0C, 0x0A, 0x05, 0x11, 0x01, 0x01, 0x01, 0x05, 0x11, 0x01, 0x03, 0x01, 0x24, 0xCC}; // Enable the data stream for IMU and EF
+    const char cmd4[12] = {0x75, 0x65, 0x0D, 0x06, 0x06, 0x03, 0x00, 0x00, 0x00, 0x00, 0xF6, 0xE4};                         // set heading at 0
+    const char cmd5[8] = {0x75, 0x65, 0x01, 0x02, 0x02, 0x06, 0xE5, 0xCB};                                                  // Resume the Device
+    const char cmd6[13] = {0x75, 0x65, 0x0C, 0x07, 0x07, 0x40, 0x01, 0x00, 0x0E, 0x10, 0x00, 0x53, 0x9D};                   // 921600 bauds
 
-   // interrrupts
-   // uart_disable_tx_intr(UART_NUM);
+    // Let the IMU some time to boot
+    //! To-Do: read uart and wait for IMU acknoledgment on cmd0 to optimize boot time and/or detect the absence of IMU
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
+    // send commands
+    uart_write_bytes(UART_NUM, cmd0, 8);
+    vTaskDelay(3);
+    uart_write_bytes(UART_NUM, cmd1, 16);
+    vTaskDelay(3);
+    uart_write_bytes(UART_NUM, cmd2, 16);
+    vTaskDelay(3);
+    uart_write_bytes(UART_NUM, cmd3, sizeof(cmd3));
+    vTaskDelay(3);
+    uart_write_bytes(UART_NUM, cmd4, sizeof(cmd4));
+    vTaskDelay(3);
+    uart_write_bytes(UART_NUM, cmd5, sizeof(cmd5));
+    vTaskDelay(3);
+    uart_write_bytes(UART_NUM, cmd6, sizeof(cmd6));
+    vTaskDelay(3);
+
+    // second step -> configure UART 921600 bauds
+    uart_set_baudrate(UART_NUM, 921600);
+
+    //    // install drivers
+    //    const int uart_buffer_size = BUF_SIZE * 2;
+    //    ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, 0, 10, &uart_queue, 0));
+
+    // interrrupts
+    // uart_disable_tx_intr(UART_NUM);
     // uart_disable_rx_intr(UART_NUM);
     // uart_isr_free(UART_NUM);
     // uart_isr_register(UART_NUM, uart_intr_handle, NULL, ESP_INTR_FLAG_IRAM, &handle_console);
     // uart_enable_rx_intr(UART_NUM);
     uart_intr_config_t uart_intr = {
         .intr_enable_mask = UART_INTR_RXFIFO_FULL | UART_INTR_RXFIFO_TOUT,
-        .rx_timeout_thresh =3,
+        .rx_timeout_thresh = 3,
         .rxfifo_full_thresh = 16,
         .txfifo_empty_intr_thresh = 0,
     };

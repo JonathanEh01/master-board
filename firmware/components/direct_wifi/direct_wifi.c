@@ -12,19 +12,19 @@ void (*wifi_recv_cb)(const esp_now_recv_info_t *esp_now_info, const uint8_t *dat
 // forward declarations
 
 /**
-* @brief    Send data using ESPNOW
-*
-* @param    data    Pointer to the data to be sent
-* @param    len     Length of the data to be sent
-*/
+ * @brief    Send data using ESPNOW
+ *
+ * @param    data    Pointer to the data to be sent
+ * @param    len     Length of the data to be sent
+ */
 void wifi_send_data(uint8_t *data, int len)
 {
   esp_err_t ret = esp_now_send(peer.peer_addr, data, len);
-  if (ret != ESP_OK) {
+  if (ret != ESP_OK)
+  {
     ESP_LOGE(WIFI_TAG, "Failed to send ESP-NOW data: %s", esp_err_to_name(ret));
   }
 }
-
 
 //**
 // * @brief    Execute the recieve callback function
@@ -86,15 +86,15 @@ void wifi_init()
   ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
   ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
   ESP_ERROR_CHECK(esp_wifi_set_country_code("JP", false));
-  
+
   // wi-fi start phase
   ESP_ERROR_CHECK(esp_wifi_start());
   ESP_ERROR_CHECK(esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE));
-  
+
   // init esp-now
   ESP_ERROR_CHECK(esp_now_init());
   ESP_ERROR_CHECK(esp_now_register_recv_cb(wifi_recv_func));
-  
+
   // add peer
   memset(&peer, 0, sizeof(esp_now_peer_info_t));
   peer.channel = 1;
@@ -105,11 +105,10 @@ void wifi_init()
 
   // config esp-now rate
   esp_now_rate_config_t rate_config = {
-    .phymode = WIFI_PHY_MODE_11B,
-    .rate = CONFIG_WIFI_DATARATE,
-    .ersu = false,
-    .dcm = false
-  };
+      .phymode = WIFI_PHY_MODE_11B,
+      .rate = CONFIG_WIFI_DATARATE,
+      .ersu = false,
+      .dcm = false};
   ESP_ERROR_CHECK(esp_now_set_peer_rate_config(peer.peer_addr, &rate_config));
 }
 

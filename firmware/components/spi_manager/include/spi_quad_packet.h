@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-/* Position of the values in the command packet */
+// Position of the values in the command packet
 #define SPI_COMMAND_MODE 0
 #define SPI_COMMAND_POS_1 1
 #define SPI_COMMAND_POS_2 3
@@ -18,7 +18,7 @@
 #define SPI_COMMAND_KD_2 12
 #define SPI_COMMAND_ISAT_12 13
 
-/* Command packet -> mode : bits */
+// Command packet -> mode : bits
 //! \brief Enable system
 #define SPI_COMMAND_MODE_ES (1<<15)
 //! \brief Enable motor 1
@@ -30,7 +30,7 @@
 //! \brief Disable system if no valid SPI packet is received during this time [in ms]. (0 = disabled)
 #define SPI_COMMAND_MODE_TIMEOUT (0xFF<<0)  //Timeout
 
-/* Qvalues for each fields */
+// Qvalues for each fields
 #define SPI_QN_POS  24
 #define SPI_QN_VEL  11
 #define SPI_QN_IQ   10
@@ -40,7 +40,7 @@
 #define SPI_QN_KP   16
 #define SPI_QN_KD   16
 
-/* Position of the values in the sensor packet */
+// Position of the values in the sensor packet
 #define SPI_SENSOR_STATUS 0
 #define SPI_SENSOR_TIMESTAMP 1
 #define SPI_SENSOR_POS_1 2
@@ -54,7 +54,7 @@
 #define SPI_SENSOR_ADC_1 12
 #define SPI_SENSOR_ADC_2 13
 
-/* sensor packet -> status : bits */
+// sensor packet -> status : bits
 //! \brief System is enabled
 #define SPI_SENSOR_STATUS_SE (1<<15)
 //! \brief Motor 1 is enabled
@@ -68,7 +68,7 @@
 //! \brief Error code
 #define SPI_SENSOR_STATUS_ERROR (0xF<<0)
 
-/* sensor packet -> status -> ERROR : values */
+// sensor packet -> status -> ERROR : values
 //! \brief No error
 #define SPI_SENSOR_STATUS_ERROR_NO_ERROR 0
 //! \brief Encoder error too high

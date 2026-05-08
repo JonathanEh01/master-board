@@ -1,7 +1,10 @@
 #ifndef SPI_MANAGER_H
 #define SPI_MANAGER_H
 
+#include "driver/spi_common.h"
 #include "driver/spi_master.h"
+#include "soc/gpio_struct.h"
+#include "driver/gpio.h"
 #include "spi_quad_packet.h"
 
 #define PIN_NUM_MISO 12

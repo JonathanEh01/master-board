@@ -60,7 +60,6 @@ struct strcut_imu_data
 // global variables
 static const char *UART_TAG = "UART";
 struct strcut_imu_data imu = {0};
-static intr_handle_t handle_console = NULL;
 static QueueHandle_t uart_queue;
 
 // Receive buffer to collect incoming data
@@ -153,7 +152,7 @@ static void uart_event_task(void *arg)
     }
 }
 
-inline bool check_IMU_CRC(unsigned char *data, int len)
+static inline bool check_IMU_CRC(unsigned char *data, int len)
 {
     if (len < 2)
         return false;
@@ -256,6 +255,10 @@ int imu_init()
     
     // set communication pins
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM, PIN_TXD, PIN_RXD, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+
+    // install drivers
+   const int uart_buffer_size = BUF_SIZE * 2;
+   ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, 0, 10, &uart_queue, 0));
     /*
     75 65 01 02 02 02 E1 C7                           // Put the Device in Idle Mode
     75 65 0C 0A 0A 08 01 02 04 00 01 05 00 01 10 73   // IMU data: acc+gyr at 1000Hz
@@ -278,11 +281,11 @@ int imu_init()
    vTaskDelay(100 / portTICK_PERIOD_MS);
    
    // send commands
-   uart_write_bytes(UART_NUM, cmd0, sizeof(cmd0));
+   uart_write_bytes(UART_NUM, cmd0, 8);
    vTaskDelay(3);
-   uart_write_bytes(UART_NUM, cmd1, sizeof(cmd1));
+   uart_write_bytes(UART_NUM, cmd1, 16);
    vTaskDelay(3);
-   uart_write_bytes(UART_NUM, cmd2, sizeof(cmd2));
+   uart_write_bytes(UART_NUM, cmd2, 16);
    vTaskDelay(3);
    uart_write_bytes(UART_NUM, cmd3, sizeof(cmd3));
    vTaskDelay(3);
@@ -296,9 +299,9 @@ int imu_init()
    // second step -> configure UART 921600 bauds
    uart_set_baudrate(UART_NUM, 921600);
    
-   // install drivers
-   const int uart_buffer_size = BUF_SIZE * 2;
-   ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, 0, 10, &uart_queue, 0));
+//    // install drivers
+//    const int uart_buffer_size = BUF_SIZE * 2;
+//    ESP_ERROR_CHECK(uart_driver_install(UART_NUM, uart_buffer_size, 0, 10, &uart_queue, 0));
 
    // interrrupts
    // uart_disable_tx_intr(UART_NUM);
@@ -315,18 +318,18 @@ int imu_init()
     ESP_ERROR_CHECK(uart_intr_config(UART_NUM, &uart_intr));
     xTaskCreate(uart_event_task, "uart_event_task", 4096, NULL, 10, NULL);
 
-    while (0) //for debug
-    {
-        parse_IMU_data();
-        printf(" intr_cpt:%d\n", intr_cpt);
-        printf("rxbuf:     ");
-        print_table(rxbuf, 80);
-        printf("rxbuf_imu: ");
-        print_table(rxbuf_imu, 80);
-        printf("rxbuf_ef:  ");
-        print_table(rxbuf_ef, 80);
-        print_imu();
-        vTaskDelay(300/portTICK_PERIOD_MS);
-    }
+    // while (0) //for debug
+    // {
+    //     parse_IMU_data();
+    //     printf(" intr_cpt:%d\n", intr_cpt);
+    //     printf("rxbuf:     ");
+    //     print_table(rxbuf, 80);
+    //     printf("rxbuf_imu: ");
+    //     print_table(rxbuf_imu, 80);
+    //     printf("rxbuf_ef:  ");
+    //     print_table(rxbuf_ef, 80);
+    //     print_imu();
+    //     vTaskDelay(300/portTICK_PERIOD_MS);
+    // }
     return 0;
 }

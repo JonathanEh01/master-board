@@ -28,6 +28,8 @@
 
 #define TEST_BIT(field, bit) (((field) & (1 << (bit))) >> (bit))
 
+static const char *MAIN_TAG = "main";
+
 long int spi_count = 0;
 
 bool spi_autodetect = false;
@@ -601,11 +603,11 @@ void app_main()
     ws2812_write_leds(ws_led);
 
     // printf("The core is : %d\n",xPortGetCoreID());
-    printf("ETH/WIFI init size %u\n", sizeof(struct wifi_eth_packet_init));
-    printf("ETH/WIFI command size %u\n", sizeof(struct wifi_eth_packet_command));
-    printf("ETH/WIFI ack size %u\n", sizeof(struct wifi_eth_packet_ack));
-    printf("ETH/WIFI sensor size %u\n", sizeof(struct wifi_eth_packet_sensor));
-    printf("SPI size %u\n", SPI_TOTAL_LEN * 2);
+    ESP_LOGI(MAIN_TAG, "ETH/WIFI init size %u", sizeof(struct wifi_eth_packet_init));
+    ESP_LOGI(MAIN_TAG, "ETH/WIFI command size %u", sizeof(struct wifi_eth_packet_command));
+    ESP_LOGI(MAIN_TAG, "ETH/WIFI ack size %u", sizeof(struct wifi_eth_packet_ack));
+    ESP_LOGI(MAIN_TAG, "ETH/WIFI sensor size %u", sizeof(struct wifi_eth_packet_sensor));
+    ESP_LOGI(MAIN_TAG, "SPI size %u", SPI_TOTAL_LEN * 2);
 
     setup_spi();
 

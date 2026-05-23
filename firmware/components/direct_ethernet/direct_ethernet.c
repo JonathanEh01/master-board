@@ -193,7 +193,8 @@ void eth_init()
   eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
   esp32_emac_config.smi_gpio.mdc_num = PIN_SMI_MDC;
   esp32_emac_config.smi_gpio.mdio_num = PIN_SMI_MDIO;
-  esp32_emac_config.clock_config.rmii.clock_mode = CONFIG_PHY_CLOCK_MODE;
+  esp32_emac_config.clock_config.rmii.clock_mode = EMAC_CLK_OUT;
+  esp32_emac_config.clock_config.rmii.clock_gpio = PIN_CLK_50HZ;
   esp_eth_mac_t *mac = esp_eth_mac_new_esp32(&esp32_emac_config, &mac_config);
 
   // configure phy

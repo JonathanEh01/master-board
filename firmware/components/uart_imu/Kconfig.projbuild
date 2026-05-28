@@ -1,0 +1,339 @@
+menu "IMU configuration"
+
+choice IMU_MODEL
+    prompt "IMU model"
+    default IMU_MODEL_MICROSTRAIN_MIP
+    help
+        Select the IMU protocol backend compiled into the firmware.
+
+config IMU_MODEL_MICROSTRAIN_MIP
+    bool "MicroStrain MIP over UART"
+
+config IMU_MODEL_BNO08X_SHTP
+    bool "SparkFun BNO08x SH-2/SHTP over UART"
+
+endchoice
+
+config IMU_BNO08X_REPORT_INTERVAL_US
+    int "BNO08x report interval in microseconds"
+    depends on IMU_MODEL_BNO08X_SHTP
+    default 2500
+    range 2500 1000000
+    help
+        Report interval requested for accelerometer, gyro, linear acceleration,
+        and game rotation vector. 2500 us requests 400 Hz, which is the BNO08x
+        maximum for gyro, linear acceleration, and game rotation vector.
+
+if IMU_MODEL_BNO08X_SHTP
+
+config IMU_BNO08X_PERSIST_ORIENTATION_FRS
+    bool "Persist BNO08x mounting orientation in FRS flash"
+    default n
+    help
+        Also write the selected mounting orientation to the BNO08x System
+        Orientation FRS record (0x2D3E). This makes the orientation persistent
+        in the sensor, but writes flash. The firmware always applies the same
+        orientation at runtime as well, so this is optional.
+
+choice IMU_BNO08X_MOUNT_ORIENTATION
+    prompt "BNO08x mounting orientation"
+    default IMU_BNO08X_MOUNT_X_EAST_Y_NORTH_Z_UP
+    help
+        Select where the BNO08x physical positive axes point in the robot body
+        frame. The names follow BNO08x datasheet Figure 4-3, mapped as:
+        East = Body +X, West = Body -X, North = Body +Y, South = Body -Y,
+        Up = Body +Z, Down = Body -Z.
+
+config IMU_BNO08X_MOUNT_X_EAST_Y_NORTH_Z_UP
+    bool "BNO +X -> Body +X, +Y -> Body +Y, +Z -> Body +Z"
+
+config IMU_BNO08X_MOUNT_X_NORTH_Y_WEST_Z_UP
+    bool "BNO +X -> Body +Y, +Y -> Body -X, +Z -> Body +Z"
+
+config IMU_BNO08X_MOUNT_X_WEST_Y_SOUTH_Z_UP
+    bool "BNO +X -> Body -X, +Y -> Body -Y, +Z -> Body +Z"
+
+config IMU_BNO08X_MOUNT_X_SOUTH_Y_EAST_Z_UP
+    bool "BNO +X -> Body -Y, +Y -> Body +X, +Z -> Body +Z"
+
+config IMU_BNO08X_MOUNT_X_EAST_Y_SOUTH_Z_DOWN
+    bool "BNO +X -> Body +X, +Y -> Body -Y, +Z -> Body -Z"
+
+config IMU_BNO08X_MOUNT_X_NORTH_Y_EAST_Z_DOWN
+    bool "BNO +X -> Body +Y, +Y -> Body +X, +Z -> Body -Z"
+
+config IMU_BNO08X_MOUNT_X_WEST_Y_NORTH_Z_DOWN
+    bool "BNO +X -> Body -X, +Y -> Body +Y, +Z -> Body -Z"
+
+config IMU_BNO08X_MOUNT_X_SOUTH_Y_WEST_Z_DOWN
+    bool "BNO +X -> Body -Y, +Y -> Body -X, +Z -> Body -Z"
+
+config IMU_BNO08X_MOUNT_X_UP_Y_SOUTH_Z_EAST
+    bool "BNO +X -> Body +Z, +Y -> Body -Y, +Z -> Body +X"
+
+config IMU_BNO08X_MOUNT_X_NORTH_Y_UP_Z_EAST
+    bool "BNO +X -> Body +Y, +Y -> Body +Z, +Z -> Body +X"
+
+config IMU_BNO08X_MOUNT_X_DOWN_Y_NORTH_Z_EAST
+    bool "BNO +X -> Body -Z, +Y -> Body +Y, +Z -> Body +X"
+
+config IMU_BNO08X_MOUNT_X_SOUTH_Y_DOWN_Z_EAST
+    bool "BNO +X -> Body -Y, +Y -> Body -Z, +Z -> Body +X"
+
+config IMU_BNO08X_MOUNT_X_UP_Y_NORTH_Z_WEST
+    bool "BNO +X -> Body +Z, +Y -> Body +Y, +Z -> Body -X"
+
+config IMU_BNO08X_MOUNT_X_NORTH_Y_DOWN_Z_WEST
+    bool "BNO +X -> Body +Y, +Y -> Body -Z, +Z -> Body -X"
+
+config IMU_BNO08X_MOUNT_X_DOWN_Y_SOUTH_Z_WEST
+    bool "BNO +X -> Body -Z, +Y -> Body -Y, +Z -> Body -X"
+
+config IMU_BNO08X_MOUNT_X_SOUTH_Y_UP_Z_WEST
+    bool "BNO +X -> Body -Y, +Y -> Body +Z, +Z -> Body -X"
+
+config IMU_BNO08X_MOUNT_X_UP_Y_EAST_Z_NORTH
+    bool "BNO +X -> Body +Z, +Y -> Body +X, +Z -> Body +Y"
+
+config IMU_BNO08X_MOUNT_X_WEST_Y_UP_Z_NORTH
+    bool "BNO +X -> Body -X, +Y -> Body +Z, +Z -> Body +Y"
+
+config IMU_BNO08X_MOUNT_X_DOWN_Y_WEST_Z_NORTH
+    bool "BNO +X -> Body -Z, +Y -> Body -X, +Z -> Body +Y"
+
+config IMU_BNO08X_MOUNT_X_EAST_Y_DOWN_Z_NORTH
+    bool "BNO +X -> Body +X, +Y -> Body -Z, +Z -> Body +Y"
+
+config IMU_BNO08X_MOUNT_X_UP_Y_WEST_Z_SOUTH
+    bool "BNO +X -> Body +Z, +Y -> Body -X, +Z -> Body -Y"
+
+config IMU_BNO08X_MOUNT_X_WEST_Y_DOWN_Z_SOUTH
+    bool "BNO +X -> Body -X, +Y -> Body -Z, +Z -> Body -Y"
+
+config IMU_BNO08X_MOUNT_X_DOWN_Y_EAST_Z_SOUTH
+    bool "BNO +X -> Body -Z, +Y -> Body +X, +Z -> Body -Y"
+
+config IMU_BNO08X_MOUNT_X_EAST_Y_UP_Z_SOUTH
+    bool "BNO +X -> Body +X, +Y -> Body +Z, +Z -> Body -Y"
+
+endchoice
+
+config IMU_BNO08X_ORIENTATION_QW_Q14
+    int
+    default 16384 if IMU_BNO08X_MOUNT_X_EAST_Y_NORTH_Z_UP
+    default 11585 if IMU_BNO08X_MOUNT_X_NORTH_Y_WEST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_SOUTH_Z_UP
+    default 11585 if IMU_BNO08X_MOUNT_X_SOUTH_Y_EAST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_SOUTH_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_NORTH_Y_EAST_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_NORTH_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_SOUTH_Y_WEST_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_UP_Y_SOUTH_Z_EAST
+    default 8192 if IMU_BNO08X_MOUNT_X_NORTH_Y_UP_Z_EAST
+    default 11585 if IMU_BNO08X_MOUNT_X_DOWN_Y_NORTH_Z_EAST
+    default 8192 if IMU_BNO08X_MOUNT_X_SOUTH_Y_DOWN_Z_EAST
+    default -11585 if IMU_BNO08X_MOUNT_X_UP_Y_NORTH_Z_WEST
+    default -8192 if IMU_BNO08X_MOUNT_X_NORTH_Y_DOWN_Z_WEST
+    default 0 if IMU_BNO08X_MOUNT_X_DOWN_Y_SOUTH_Z_WEST
+    default 8192 if IMU_BNO08X_MOUNT_X_SOUTH_Y_UP_Z_WEST
+    default -8192 if IMU_BNO08X_MOUNT_X_UP_Y_EAST_Z_NORTH
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_UP_Z_NORTH
+    default 8192 if IMU_BNO08X_MOUNT_X_DOWN_Y_WEST_Z_NORTH
+    default -11585 if IMU_BNO08X_MOUNT_X_EAST_Y_DOWN_Z_NORTH
+    default 8192 if IMU_BNO08X_MOUNT_X_UP_Y_WEST_Z_SOUTH
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_DOWN_Z_SOUTH
+    default 8192 if IMU_BNO08X_MOUNT_X_DOWN_Y_EAST_Z_SOUTH
+    default 11585 if IMU_BNO08X_MOUNT_X_EAST_Y_UP_Z_SOUTH
+
+config IMU_BNO08X_ORIENTATION_QX_Q14
+    int
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_NORTH_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_NORTH_Y_WEST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_SOUTH_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_SOUTH_Y_EAST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_SOUTH_Z_DOWN
+    default -11585 if IMU_BNO08X_MOUNT_X_NORTH_Y_EAST_Z_DOWN
+    default -16384 if IMU_BNO08X_MOUNT_X_WEST_Y_NORTH_Z_DOWN
+    default -11585 if IMU_BNO08X_MOUNT_X_SOUTH_Y_WEST_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_UP_Y_SOUTH_Z_EAST
+    default -8192 if IMU_BNO08X_MOUNT_X_NORTH_Y_UP_Z_EAST
+    default -11585 if IMU_BNO08X_MOUNT_X_DOWN_Y_NORTH_Z_EAST
+    default -8192 if IMU_BNO08X_MOUNT_X_SOUTH_Y_DOWN_Z_EAST
+    default -11585 if IMU_BNO08X_MOUNT_X_UP_Y_NORTH_Z_WEST
+    default -8192 if IMU_BNO08X_MOUNT_X_NORTH_Y_DOWN_Z_WEST
+    default 0 if IMU_BNO08X_MOUNT_X_DOWN_Y_SOUTH_Z_WEST
+    default 8192 if IMU_BNO08X_MOUNT_X_SOUTH_Y_UP_Z_WEST
+    default -8192 if IMU_BNO08X_MOUNT_X_UP_Y_EAST_Z_NORTH
+    default -11585 if IMU_BNO08X_MOUNT_X_WEST_Y_UP_Z_NORTH
+    default -8192 if IMU_BNO08X_MOUNT_X_DOWN_Y_WEST_Z_NORTH
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_DOWN_Z_NORTH
+    default 8192 if IMU_BNO08X_MOUNT_X_UP_Y_WEST_Z_SOUTH
+    default -11585 if IMU_BNO08X_MOUNT_X_WEST_Y_DOWN_Z_SOUTH
+    default -8192 if IMU_BNO08X_MOUNT_X_DOWN_Y_EAST_Z_SOUTH
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_UP_Z_SOUTH
+
+config IMU_BNO08X_ORIENTATION_QY_Q14
+    int
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_NORTH_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_NORTH_Y_WEST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_SOUTH_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_SOUTH_Y_EAST_Z_UP
+    default -16384 if IMU_BNO08X_MOUNT_X_EAST_Y_SOUTH_Z_DOWN
+    default -11585 if IMU_BNO08X_MOUNT_X_NORTH_Y_EAST_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_NORTH_Z_DOWN
+    default 11585 if IMU_BNO08X_MOUNT_X_SOUTH_Y_WEST_Z_DOWN
+    default -11585 if IMU_BNO08X_MOUNT_X_UP_Y_SOUTH_Z_EAST
+    default -8192 if IMU_BNO08X_MOUNT_X_NORTH_Y_UP_Z_EAST
+    default 0 if IMU_BNO08X_MOUNT_X_DOWN_Y_NORTH_Z_EAST
+    default 8192 if IMU_BNO08X_MOUNT_X_SOUTH_Y_DOWN_Z_EAST
+    default 0 if IMU_BNO08X_MOUNT_X_UP_Y_NORTH_Z_WEST
+    default -8192 if IMU_BNO08X_MOUNT_X_NORTH_Y_DOWN_Z_WEST
+    default -11585 if IMU_BNO08X_MOUNT_X_DOWN_Y_SOUTH_Z_WEST
+    default -8192 if IMU_BNO08X_MOUNT_X_SOUTH_Y_UP_Z_WEST
+    default -8192 if IMU_BNO08X_MOUNT_X_UP_Y_EAST_Z_NORTH
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_UP_Z_NORTH
+    default 8192 if IMU_BNO08X_MOUNT_X_DOWN_Y_WEST_Z_NORTH
+    default -11585 if IMU_BNO08X_MOUNT_X_EAST_Y_DOWN_Z_NORTH
+    default -8192 if IMU_BNO08X_MOUNT_X_UP_Y_WEST_Z_SOUTH
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_DOWN_Z_SOUTH
+    default -8192 if IMU_BNO08X_MOUNT_X_DOWN_Y_EAST_Z_SOUTH
+    default -11585 if IMU_BNO08X_MOUNT_X_EAST_Y_UP_Z_SOUTH
+
+config IMU_BNO08X_ORIENTATION_QZ_Q14
+    int
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_NORTH_Z_UP
+    default 11585 if IMU_BNO08X_MOUNT_X_NORTH_Y_WEST_Z_UP
+    default 16384 if IMU_BNO08X_MOUNT_X_WEST_Y_SOUTH_Z_UP
+    default -11585 if IMU_BNO08X_MOUNT_X_SOUTH_Y_EAST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_SOUTH_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_NORTH_Y_EAST_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_NORTH_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_SOUTH_Y_WEST_Z_DOWN
+    default 11585 if IMU_BNO08X_MOUNT_X_UP_Y_SOUTH_Z_EAST
+    default 8192 if IMU_BNO08X_MOUNT_X_NORTH_Y_UP_Z_EAST
+    default 0 if IMU_BNO08X_MOUNT_X_DOWN_Y_NORTH_Z_EAST
+    default -8192 if IMU_BNO08X_MOUNT_X_SOUTH_Y_DOWN_Z_EAST
+    default 0 if IMU_BNO08X_MOUNT_X_UP_Y_NORTH_Z_WEST
+    default -8192 if IMU_BNO08X_MOUNT_X_NORTH_Y_DOWN_Z_WEST
+    default -11585 if IMU_BNO08X_MOUNT_X_DOWN_Y_SOUTH_Z_WEST
+    default -8192 if IMU_BNO08X_MOUNT_X_SOUTH_Y_UP_Z_WEST
+    default 8192 if IMU_BNO08X_MOUNT_X_UP_Y_EAST_Z_NORTH
+    default 11585 if IMU_BNO08X_MOUNT_X_WEST_Y_UP_Z_NORTH
+    default 8192 if IMU_BNO08X_MOUNT_X_DOWN_Y_WEST_Z_NORTH
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_DOWN_Z_NORTH
+    default 8192 if IMU_BNO08X_MOUNT_X_UP_Y_WEST_Z_SOUTH
+    default -11585 if IMU_BNO08X_MOUNT_X_WEST_Y_DOWN_Z_SOUTH
+    default -8192 if IMU_BNO08X_MOUNT_X_DOWN_Y_EAST_Z_SOUTH
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_UP_Z_SOUTH
+
+config IMU_BNO08X_ORIENTATION_QW_Q30
+    int
+    default 1073741824 if IMU_BNO08X_MOUNT_X_EAST_Y_NORTH_Z_UP
+    default 759250125 if IMU_BNO08X_MOUNT_X_NORTH_Y_WEST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_SOUTH_Z_UP
+    default 759250125 if IMU_BNO08X_MOUNT_X_SOUTH_Y_EAST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_SOUTH_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_NORTH_Y_EAST_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_NORTH_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_SOUTH_Y_WEST_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_UP_Y_SOUTH_Z_EAST
+    default 536870912 if IMU_BNO08X_MOUNT_X_NORTH_Y_UP_Z_EAST
+    default 759250125 if IMU_BNO08X_MOUNT_X_DOWN_Y_NORTH_Z_EAST
+    default 536870912 if IMU_BNO08X_MOUNT_X_SOUTH_Y_DOWN_Z_EAST
+    default -759250125 if IMU_BNO08X_MOUNT_X_UP_Y_NORTH_Z_WEST
+    default -536870912 if IMU_BNO08X_MOUNT_X_NORTH_Y_DOWN_Z_WEST
+    default 0 if IMU_BNO08X_MOUNT_X_DOWN_Y_SOUTH_Z_WEST
+    default 536870912 if IMU_BNO08X_MOUNT_X_SOUTH_Y_UP_Z_WEST
+    default -536870912 if IMU_BNO08X_MOUNT_X_UP_Y_EAST_Z_NORTH
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_UP_Z_NORTH
+    default 536870912 if IMU_BNO08X_MOUNT_X_DOWN_Y_WEST_Z_NORTH
+    default -759250125 if IMU_BNO08X_MOUNT_X_EAST_Y_DOWN_Z_NORTH
+    default 536870912 if IMU_BNO08X_MOUNT_X_UP_Y_WEST_Z_SOUTH
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_DOWN_Z_SOUTH
+    default 536870912 if IMU_BNO08X_MOUNT_X_DOWN_Y_EAST_Z_SOUTH
+    default 759250125 if IMU_BNO08X_MOUNT_X_EAST_Y_UP_Z_SOUTH
+
+config IMU_BNO08X_ORIENTATION_QX_Q30
+    int
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_NORTH_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_NORTH_Y_WEST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_SOUTH_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_SOUTH_Y_EAST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_SOUTH_Z_DOWN
+    default -759250125 if IMU_BNO08X_MOUNT_X_NORTH_Y_EAST_Z_DOWN
+    default -1073741824 if IMU_BNO08X_MOUNT_X_WEST_Y_NORTH_Z_DOWN
+    default -759250125 if IMU_BNO08X_MOUNT_X_SOUTH_Y_WEST_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_UP_Y_SOUTH_Z_EAST
+    default -536870912 if IMU_BNO08X_MOUNT_X_NORTH_Y_UP_Z_EAST
+    default -759250125 if IMU_BNO08X_MOUNT_X_DOWN_Y_NORTH_Z_EAST
+    default -536870912 if IMU_BNO08X_MOUNT_X_SOUTH_Y_DOWN_Z_EAST
+    default -759250125 if IMU_BNO08X_MOUNT_X_UP_Y_NORTH_Z_WEST
+    default -536870912 if IMU_BNO08X_MOUNT_X_NORTH_Y_DOWN_Z_WEST
+    default 0 if IMU_BNO08X_MOUNT_X_DOWN_Y_SOUTH_Z_WEST
+    default 536870912 if IMU_BNO08X_MOUNT_X_SOUTH_Y_UP_Z_WEST
+    default -536870912 if IMU_BNO08X_MOUNT_X_UP_Y_EAST_Z_NORTH
+    default -759250125 if IMU_BNO08X_MOUNT_X_WEST_Y_UP_Z_NORTH
+    default -536870912 if IMU_BNO08X_MOUNT_X_DOWN_Y_WEST_Z_NORTH
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_DOWN_Z_NORTH
+    default 536870912 if IMU_BNO08X_MOUNT_X_UP_Y_WEST_Z_SOUTH
+    default -759250125 if IMU_BNO08X_MOUNT_X_WEST_Y_DOWN_Z_SOUTH
+    default -536870912 if IMU_BNO08X_MOUNT_X_DOWN_Y_EAST_Z_SOUTH
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_UP_Z_SOUTH
+
+config IMU_BNO08X_ORIENTATION_QY_Q30
+    int
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_NORTH_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_NORTH_Y_WEST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_SOUTH_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_SOUTH_Y_EAST_Z_UP
+    default -1073741824 if IMU_BNO08X_MOUNT_X_EAST_Y_SOUTH_Z_DOWN
+    default -759250125 if IMU_BNO08X_MOUNT_X_NORTH_Y_EAST_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_NORTH_Z_DOWN
+    default 759250125 if IMU_BNO08X_MOUNT_X_SOUTH_Y_WEST_Z_DOWN
+    default -759250125 if IMU_BNO08X_MOUNT_X_UP_Y_SOUTH_Z_EAST
+    default -536870912 if IMU_BNO08X_MOUNT_X_NORTH_Y_UP_Z_EAST
+    default 0 if IMU_BNO08X_MOUNT_X_DOWN_Y_NORTH_Z_EAST
+    default 536870912 if IMU_BNO08X_MOUNT_X_SOUTH_Y_DOWN_Z_EAST
+    default 0 if IMU_BNO08X_MOUNT_X_UP_Y_NORTH_Z_WEST
+    default -536870912 if IMU_BNO08X_MOUNT_X_NORTH_Y_DOWN_Z_WEST
+    default -759250125 if IMU_BNO08X_MOUNT_X_DOWN_Y_SOUTH_Z_WEST
+    default -536870912 if IMU_BNO08X_MOUNT_X_SOUTH_Y_UP_Z_WEST
+    default -536870912 if IMU_BNO08X_MOUNT_X_UP_Y_EAST_Z_NORTH
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_UP_Z_NORTH
+    default 536870912 if IMU_BNO08X_MOUNT_X_DOWN_Y_WEST_Z_NORTH
+    default -759250125 if IMU_BNO08X_MOUNT_X_EAST_Y_DOWN_Z_NORTH
+    default -536870912 if IMU_BNO08X_MOUNT_X_UP_Y_WEST_Z_SOUTH
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_DOWN_Z_SOUTH
+    default -536870912 if IMU_BNO08X_MOUNT_X_DOWN_Y_EAST_Z_SOUTH
+    default -759250125 if IMU_BNO08X_MOUNT_X_EAST_Y_UP_Z_SOUTH
+
+config IMU_BNO08X_ORIENTATION_QZ_Q30
+    int
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_NORTH_Z_UP
+    default 759250125 if IMU_BNO08X_MOUNT_X_NORTH_Y_WEST_Z_UP
+    default 1073741824 if IMU_BNO08X_MOUNT_X_WEST_Y_SOUTH_Z_UP
+    default -759250125 if IMU_BNO08X_MOUNT_X_SOUTH_Y_EAST_Z_UP
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_SOUTH_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_NORTH_Y_EAST_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_WEST_Y_NORTH_Z_DOWN
+    default 0 if IMU_BNO08X_MOUNT_X_SOUTH_Y_WEST_Z_DOWN
+    default 759250125 if IMU_BNO08X_MOUNT_X_UP_Y_SOUTH_Z_EAST
+    default 536870912 if IMU_BNO08X_MOUNT_X_NORTH_Y_UP_Z_EAST
+    default 0 if IMU_BNO08X_MOUNT_X_DOWN_Y_NORTH_Z_EAST
+    default -536870912 if IMU_BNO08X_MOUNT_X_SOUTH_Y_DOWN_Z_EAST
+    default 0 if IMU_BNO08X_MOUNT_X_UP_Y_NORTH_Z_WEST
+    default -536870912 if IMU_BNO08X_MOUNT_X_NORTH_Y_DOWN_Z_WEST
+    default -759250125 if IMU_BNO08X_MOUNT_X_DOWN_Y_SOUTH_Z_WEST
+    default -536870912 if IMU_BNO08X_MOUNT_X_SOUTH_Y_UP_Z_WEST
+    default 536870912 if IMU_BNO08X_MOUNT_X_UP_Y_EAST_Z_NORTH
+    default 759250125 if IMU_BNO08X_MOUNT_X_WEST_Y_UP_Z_NORTH
+    default 536870912 if IMU_BNO08X_MOUNT_X_DOWN_Y_WEST_Z_NORTH
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_DOWN_Z_NORTH
+    default 536870912 if IMU_BNO08X_MOUNT_X_UP_Y_WEST_Z_SOUTH
+    default -759250125 if IMU_BNO08X_MOUNT_X_WEST_Y_DOWN_Z_SOUTH
+    default -536870912 if IMU_BNO08X_MOUNT_X_DOWN_Y_EAST_Z_SOUTH
+    default 0 if IMU_BNO08X_MOUNT_X_EAST_Y_UP_Z_SOUTH
+
+endif
+
+endmenu

@@ -375,21 +375,24 @@ static void periodic_timer_callback(void *arg)
 
     /* Get IMU latest data*/
     parse_IMU_data();
-    wifi_eth_tx_data.imu.accelerometer[0] = get_acc_x_in_D16QN();
-    wifi_eth_tx_data.imu.accelerometer[1] = get_acc_y_in_D16QN();
-    wifi_eth_tx_data.imu.accelerometer[2] = get_acc_z_in_D16QN();
+    struct imu_data_d16qn imu_snapshot;
+    get_imu_snapshot_d16qn(&imu_snapshot);
+    
+    wifi_eth_tx_data.imu.accelerometer[0] = imu_snapshot.acc_x;
+    wifi_eth_tx_data.imu.accelerometer[1] = imu_snapshot.acc_y;
+    wifi_eth_tx_data.imu.accelerometer[2] = imu_snapshot.acc_z;
 
-    wifi_eth_tx_data.imu.gyroscope[0] = get_gyr_x_in_D16QN();
-    wifi_eth_tx_data.imu.gyroscope[1] = get_gyr_y_in_D16QN();
-    wifi_eth_tx_data.imu.gyroscope[2] = get_gyr_z_in_D16QN();
+    wifi_eth_tx_data.imu.gyroscope[0] = imu_snapshot.gyr_x;
+    wifi_eth_tx_data.imu.gyroscope[1] = imu_snapshot.gyr_y;
+    wifi_eth_tx_data.imu.gyroscope[2] = imu_snapshot.gyr_z;
 
-    wifi_eth_tx_data.imu.attitude[0] = get_roll_in_D16QN();
-    wifi_eth_tx_data.imu.attitude[1] = get_pitch_in_D16QN();
-    wifi_eth_tx_data.imu.attitude[2] = get_yaw_in_D16QN();
+    wifi_eth_tx_data.imu.attitude[0] = imu_snapshot.roll;
+    wifi_eth_tx_data.imu.attitude[1] = imu_snapshot.pitch;
+    wifi_eth_tx_data.imu.attitude[2] = imu_snapshot.yaw;
 
-    wifi_eth_tx_data.imu.linear_acceleration[0] = get_linacc_x_in_D16QN();
-    wifi_eth_tx_data.imu.linear_acceleration[1] = get_linacc_y_in_D16QN();
-    wifi_eth_tx_data.imu.linear_acceleration[2] = get_linacc_z_in_D16QN();
+    wifi_eth_tx_data.imu.linear_acceleration[0] = imu_snapshot.linacc_x;
+    wifi_eth_tx_data.imu.linear_acceleration[1] = imu_snapshot.linacc_y;
+    wifi_eth_tx_data.imu.linear_acceleration[2] = imu_snapshot.linacc_z;
 
     /* Sends message to PC */
     switch (current_state)
@@ -595,7 +598,7 @@ void wifi_eth_link_state_cb(bool new_state)
 
 void app_main()
 {
-    uart_set_baudrate(UART_NUM_0, 2000000);
+    // uart_set_baudrate(UART_NUM_0, 2000000);
     nvs_flash_init();
     wifi_eth_rx_cmd_mailbox = xQueueCreate(1, sizeof(struct wifi_eth_packet_command));
     ws2812_control_init(); // init the LEDs

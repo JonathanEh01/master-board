@@ -377,6 +377,13 @@ static void periodic_timer_callback(void *arg)
     parse_IMU_data();
     struct imu_data_d16qn imu_snapshot;
     get_imu_snapshot_d16qn(&imu_snapshot);
+
+    if (ENABLE_DEBUG_PRINTF && spi_count % 1000 == 0)
+    {
+        printf("\n--- IMU ---");
+        print_imu();
+        printf("\n");
+    }
     
     wifi_eth_tx_data.imu.accelerometer[0] = imu_snapshot.acc_x;
     wifi_eth_tx_data.imu.accelerometer[1] = imu_snapshot.acc_y;

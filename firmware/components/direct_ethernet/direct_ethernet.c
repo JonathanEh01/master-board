@@ -85,7 +85,10 @@ static void got_ip_event_handler(void *arg, esp_event_base_t event_base,
   ESP_LOGI(ETH_TAG, "ETHGW:" IPSTR, IP2STR(&ip_info->gw));
   ESP_LOGI(ETH_TAG, "~~~~~~~~~~~");
 
-  xEventGroupSetBits(udp_event_group, WIFI_CONNECTED_BIT);
+  if (udp_event_group != NULL)
+  {
+    xEventGroupSetBits(udp_event_group, WIFI_CONNECTED_BIT);
+  }
 }
 
 static esp_err_t eth_recv_func(esp_eth_handle_t hdl, uint8_t *buffer, uint32_t len, void *priv)
@@ -111,7 +114,6 @@ static esp_err_t eth_recv_func(esp_eth_handle_t hdl, uint8_t *buffer, uint32_t l
   else
   {
     free(buffer);
-    ESP_LOGW(ETH_TAG, "Received frame does not meet the expected format or length requirements.");
   }
 
   return ESP_OK;
@@ -241,6 +243,9 @@ void eth_init()
 
 void eth_deinit()
 {
+  (void)esp_event_handler_unregister(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler);
+  (void)esp_event_handler_unregister(ETH_EVENT, ESP_EVENT_ANY_ID, &eth_event_handler);
+
   if (eth_handle != NULL)
   {
     ESP_ERROR_CHECK(esp_eth_stop(eth_handle));

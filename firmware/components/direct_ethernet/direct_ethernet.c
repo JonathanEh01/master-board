@@ -119,6 +119,32 @@ static esp_err_t eth_recv_func(esp_eth_handle_t hdl, uint8_t *buffer, uint32_t l
   return ESP_OK;
 }
 
+static esp_err_t lan87xx_after_clock_start(esp_eth_handle_t hdl)
+{
+  (void)hdl;
+  int phy_rst = PIN_PHY_RST;
+
+  vTaskDelay(pdMS_TO_TICKS(LAN87XX_REF_CLK_SETTLE_MS));
+
+  if (phy_rst >= 0)
+  {
+    gpio_config_t io_conf = {
+        .pin_bit_mask = 1ULL << phy_rst,
+        .mode = GPIO_MODE_OUTPUT,
+        .pull_up_en = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_DISABLE};
+    ESP_ERROR_CHECK(gpio_config(&io_conf));
+
+    gpio_set_level(phy_rst, 0);
+    vTaskDelay(pdMS_TO_TICKS(LAN87XX_PHY_RESET_ASSERT_MS));
+    gpio_set_level(phy_rst, 1);
+    vTaskDelay(pdMS_TO_TICKS(LAN87XX_PHY_POST_RESET_MS));
+  }
+
+  return ESP_OK;
+}
+
 void eth_init_frame(eth_frame *p_frame)
 {
   p_frame->ethertype = ETHERTYPE;
@@ -179,17 +205,6 @@ void eth_init()
 {
   udp_event_group = xEventGroupCreate();
 
-  // config gpio for 50Hz clock input from phy
-  gpio_config_t io_conf = {
-      .pin_bit_mask = 1ULL << PIN_CLK_50HZ,
-      .mode = GPIO_MODE_INPUT,
-      .pull_up_en = GPIO_PULLUP_DISABLE,
-      .pull_down_en = GPIO_PULLDOWN_DISABLE,
-      .intr_type = GPIO_INTR_DISABLE};
-  ESP_ERROR_CHECK(gpio_config(&io_conf));
-  ESP_ERROR_CHECK(gpio_set_level(PIN_CLK_50HZ, 1));
-  vTaskDelay(pdMS_TO_TICKS(10));
-
   // configure emac
   eth_mac_config_t mac_config = ETH_MAC_DEFAULT_CONFIG();
   eth_esp32_emac_config_t esp32_emac_config = ETH_ESP32_EMAC_DEFAULT_CONFIG();
@@ -202,12 +217,14 @@ void eth_init()
   // configure phy
   eth_phy_config_t phy_config = ETH_PHY_DEFAULT_CONFIG();
   phy_config.phy_addr = -1;
-  phy_config.reset_gpio_num = -1;
+  phy_config.reset_gpio_num = PIN_PHY_RST;
+  phy_config.reset_timeout_ms = 500;
   esp_eth_phy_t *phy = esp_eth_phy_new_lan87xx(&phy_config);
 
   // install driver
   esp_eth_config_t config = ETH_DEFAULT_CONFIG(mac, phy);
-  esp_eth_driver_install(&config, &eth_handle);
+  config.on_lowlevel_init_done = lan87xx_after_clock_start;
+  ESP_ERROR_CHECK(esp_eth_driver_install(&config, &eth_handle));
 
   esp_err_t err = esp_event_loop_create_default();
   if (err != ESP_OK && err != ESP_ERR_INVALID_STATE)
@@ -234,11 +251,11 @@ void eth_init()
 
   eth_glue = esp_eth_new_netif_glue(eth_handle);
   ESP_ERROR_CHECK(esp_netif_attach(eth_netif, eth_glue));
-  esp_eth_update_input_path(eth_handle, eth_recv_func, eth_netif);
+  ESP_ERROR_CHECK(esp_eth_update_input_path(eth_handle, eth_recv_func, eth_netif));
   ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_ETH_GOT_IP, &got_ip_event_handler, NULL));
 
   // start ethernet driver
-  esp_eth_start(eth_handle);
+  ESP_ERROR_CHECK(esp_eth_start(eth_handle));
 }
 
 void eth_deinit()

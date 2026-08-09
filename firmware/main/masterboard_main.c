@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "freertos/timers.h"
 
 #include "driver/gpio.h"
@@ -19,8 +20,10 @@
 #include "uart_imu.h"
 #include "ws2812b_led.h"
 #include "defines.h"
+#include "driver/uart.h"
+#include "hal/uart_types.h"
 
-#define ENABLE_DEBUG_PRINTF false
+#define ENABLE_DEBUG_PRINTF true
 
 #define SPI_AUTODETECT_MAX_COUNT 50 // number of spi transaction for which the master board will try to detect spi slaves
 
@@ -58,6 +61,7 @@ unsigned int ms_cpt = 0;
 struct led_state ws_led;
 
 static uint16_t spi_index_trans = 0;
+static TaskHandle_t periodic_task_handle;
 
 static uint16_t spi_rx_packet[CONFIG_N_SLAVES][SPI_TOTAL_LEN + 1]; // +1 prevents any overflow //TODO understand why we need this?
 static uint16_t spi_tx_packet[CONFIG_N_SLAVES][SPI_TOTAL_LEN];
@@ -108,7 +112,7 @@ void set_all_leds(uint32_t rgb)
     }
 }
 
-static void periodic_timer_callback(void *arg)
+static void periodic_control_step(void)
 {
     // handling state change
     if (current_state != next_state)
@@ -446,11 +450,34 @@ static void periodic_timer_callback(void *arg)
     }
 }
 
+static void periodic_task(void *arg)
+{
+    (void)arg;
+
+    while (true)
+    {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        periodic_control_step();
+    }
+}
+
+static void periodic_timer_callback(void *arg)
+{
+    (void)arg;
+
+    if (periodic_task_handle != NULL)
+    {
+        xTaskNotifyGive(periodic_task_handle);
+    }
+}
+
 void setup_spi()
 {
     spi_init();
     wifi_eth_tx_data.sensor_index = 0;
     wifi_eth_tx_data.packet_loss = 0;
+
+    xTaskCreate(periodic_task, "periodic_control", 4096, NULL, 18, &periodic_task_handle);
 
     // create the timer
     esp_timer_handle_t periodic_timer;
@@ -625,7 +652,7 @@ void app_main()
 
     eth_attach_link_state_cb(wifi_eth_link_state_cb);
     eth_attach_recv_cb(eth_receive_cb);
-    eth_init();
+    // eth_init();
 
     wifi_init();
     wifi_attach_recv_cb(wifi_receive_cb);

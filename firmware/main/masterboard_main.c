@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "freertos/timers.h"
 
 #include "driver/gpio.h"
@@ -19,8 +20,10 @@
 #include "uart_imu.h"
 #include "ws2812b_led.h"
 #include "defines.h"
+#include "driver/uart.h"
+#include "hal/uart_types.h"
 
-#define ENABLE_DEBUG_PRINTF false
+#define ENABLE_DEBUG_PRINTF true
 
 #define SPI_AUTODETECT_MAX_COUNT 50 // number of spi transaction for which the master board will try to detect spi slaves
 
@@ -58,6 +61,7 @@ unsigned int ms_cpt = 0;
 struct led_state ws_led;
 
 static uint16_t spi_index_trans = 0;
+static TaskHandle_t periodic_task_handle;
 
 static uint16_t spi_rx_packet[CONFIG_N_SLAVES][SPI_TOTAL_LEN + 1]; // +1 prevents any overflow //TODO understand why we need this?
 static uint16_t spi_tx_packet[CONFIG_N_SLAVES][SPI_TOTAL_LEN];
@@ -108,7 +112,7 @@ void set_all_leds(uint32_t rgb)
     }
 }
 
-static void periodic_timer_callback(void *arg)
+static void periodic_control_step(void)
 {
     // handling state change
     if (current_state != next_state)
@@ -375,21 +379,31 @@ static void periodic_timer_callback(void *arg)
 
     /* Get IMU latest data*/
     parse_IMU_data();
-    wifi_eth_tx_data.imu.accelerometer[0] = get_acc_x_in_D16QN();
-    wifi_eth_tx_data.imu.accelerometer[1] = get_acc_y_in_D16QN();
-    wifi_eth_tx_data.imu.accelerometer[2] = get_acc_z_in_D16QN();
+    struct imu_data_d16qn imu_snapshot;
+    get_imu_snapshot_d16qn(&imu_snapshot);
 
-    wifi_eth_tx_data.imu.gyroscope[0] = get_gyr_x_in_D16QN();
-    wifi_eth_tx_data.imu.gyroscope[1] = get_gyr_y_in_D16QN();
-    wifi_eth_tx_data.imu.gyroscope[2] = get_gyr_z_in_D16QN();
+    if (ENABLE_DEBUG_PRINTF && spi_count % 1000 == 0)
+    {
+        printf("\n--- IMU ---");
+        print_imu();
+        printf("\n");
+    }
+    
+    wifi_eth_tx_data.imu.accelerometer[0] = imu_snapshot.acc_x;
+    wifi_eth_tx_data.imu.accelerometer[1] = imu_snapshot.acc_y;
+    wifi_eth_tx_data.imu.accelerometer[2] = imu_snapshot.acc_z;
 
-    wifi_eth_tx_data.imu.attitude[0] = get_roll_in_D16QN();
-    wifi_eth_tx_data.imu.attitude[1] = get_pitch_in_D16QN();
-    wifi_eth_tx_data.imu.attitude[2] = get_yaw_in_D16QN();
+    wifi_eth_tx_data.imu.gyroscope[0] = imu_snapshot.gyr_x;
+    wifi_eth_tx_data.imu.gyroscope[1] = imu_snapshot.gyr_y;
+    wifi_eth_tx_data.imu.gyroscope[2] = imu_snapshot.gyr_z;
 
-    wifi_eth_tx_data.imu.linear_acceleration[0] = get_linacc_x_in_D16QN();
-    wifi_eth_tx_data.imu.linear_acceleration[1] = get_linacc_y_in_D16QN();
-    wifi_eth_tx_data.imu.linear_acceleration[2] = get_linacc_z_in_D16QN();
+    wifi_eth_tx_data.imu.attitude[0] = imu_snapshot.roll;
+    wifi_eth_tx_data.imu.attitude[1] = imu_snapshot.pitch;
+    wifi_eth_tx_data.imu.attitude[2] = imu_snapshot.yaw;
+
+    wifi_eth_tx_data.imu.linear_acceleration[0] = imu_snapshot.linacc_x;
+    wifi_eth_tx_data.imu.linear_acceleration[1] = imu_snapshot.linacc_y;
+    wifi_eth_tx_data.imu.linear_acceleration[2] = imu_snapshot.linacc_z;
 
     /* Sends message to PC */
     switch (current_state)
@@ -436,11 +450,34 @@ static void periodic_timer_callback(void *arg)
     }
 }
 
+static void periodic_task(void *arg)
+{
+    (void)arg;
+
+    while (true)
+    {
+        ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+        periodic_control_step();
+    }
+}
+
+static void periodic_timer_callback(void *arg)
+{
+    (void)arg;
+
+    if (periodic_task_handle != NULL)
+    {
+        xTaskNotifyGive(periodic_task_handle);
+    }
+}
+
 void setup_spi()
 {
     spi_init();
     wifi_eth_tx_data.sensor_index = 0;
     wifi_eth_tx_data.packet_loss = 0;
+
+    xTaskCreate(periodic_task, "periodic_control", 4096, NULL, 18, &periodic_task_handle);
 
     // create the timer
     esp_timer_handle_t periodic_timer;
@@ -595,7 +632,7 @@ void wifi_eth_link_state_cb(bool new_state)
 
 void app_main()
 {
-    uart_set_baudrate(UART_NUM_0, 2000000);
+    // uart_set_baudrate(UART_NUM_0, 2000000);
     nvs_flash_init();
     wifi_eth_rx_cmd_mailbox = xQueueCreate(1, sizeof(struct wifi_eth_packet_command));
     ws2812_control_init(); // init the LEDs
@@ -615,7 +652,7 @@ void app_main()
 
     eth_attach_link_state_cb(wifi_eth_link_state_cb);
     eth_attach_recv_cb(eth_receive_cb);
-    eth_init();
+    // eth_init();
 
     wifi_init();
     wifi_attach_recv_cb(wifi_receive_cb);

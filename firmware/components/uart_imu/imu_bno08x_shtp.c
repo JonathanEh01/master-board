@@ -18,8 +18,8 @@
 #define PIN_TXD 32
 #define PIN_RXD 35
 
-#define BNO_UART_BAUD 3000000
-#define BNO_UART_RX_BUF_SIZE 2048
+#define BNO_UART_BAUD 3'000'000
+#define BNO_UART_RX_BUF_SIZE 2'048
 #define BNO_UART_EVENT_QUEUE_SIZE 16
 
 #define BNO_UART_FLAG 0x7E
@@ -42,6 +42,8 @@
 #define SH2_REPORT_LINEAR_ACCELERATION 0x04
 #define SH2_REPORT_ROTATION_VECTOR 0x05
 #define SH2_REPORT_GAME_ROTATION_VECTOR 0x08
+#define SH2_REPORT_PRODUCT_ID_REQUEST 0xF9
+#define SH2_REPORT_PRODUCT_ID_RESPONSE 0xF8
 #define SH2_REPORT_SET_FEATURE 0xFD
 #define SH2_REPORT_GET_FEATURE_RESPONSE 0xFC
 #define SH2_REPORT_TIMEBASE_REFERENCE 0xFB
@@ -56,6 +58,7 @@
 #define SH2_REPORT_LEN_GAME_RV 12
 #define SH2_REPORT_LEN_RV 14
 #define SH2_REPORT_LEN_TIMEBASE 5
+#define SH2_REPORT_LEN_PRODUCT_ID_RESPONSE 16
 #define SH2_REPORT_LEN_FEATURE_RESPONSE 17
 #define SH2_REPORT_LEN_FRS_WRITE_RESPONSE 4
 #define SH2_REPORT_LEN_COMMAND_RESPONSE 16
@@ -71,7 +74,10 @@
 #define SH2_FRS_WRITE_STATUS_RECORD_VALID 8
 
 #define SH2_COMMAND_TARE 0x03
+#define SH2_COMMAND_INITIALIZE 0x04
+#define SH2_COMMAND_INITIALIZE_UNSOLICITED 0x84
 #define SH2_TARE_SET_REORIENTATION 0x02
+#define SH2_EXECUTABLE_RESET_COMPLETE 0x01
 
 #define STANDARD_GRAVITY_MPS2 9.80665f
 
@@ -86,7 +92,9 @@ static uint8_t tx_sequence[6];
 static uint8_t command_sequence;
 static uint8_t last_report_sequence[256];
 static bool report_sequence_seen[256];
-static volatile uint16_t host_write_available;
+static volatile bool bno_executable_reset_seen;
+static volatile bool bno_sh2_init_seen;
+static volatile bool bno_product_id_seen;
 static volatile uint8_t frs_write_response_count;
 static volatile uint8_t frs_write_status;
 static volatile uint16_t frs_write_offset;
@@ -208,6 +216,25 @@ static void handle_command_response(const uint8_t *report)
              report[2],
              report[3],
              report[5]);
+
+    if (report[2] == SH2_COMMAND_INITIALIZE ||
+        report[2] == SH2_COMMAND_INITIALIZE_UNSOLICITED)
+    {
+        bno_sh2_init_seen = (report[5] == 0);
+    }
+}
+
+static void handle_product_id_response(const uint8_t *report)
+{
+    const uint16_t sw_patch = (uint16_t)report[12] | ((uint16_t)report[13] << 8);
+
+    bno_product_id_seen = true;
+    ESP_LOGI(UART_TAG,
+             "BNO08x product ID reset cause %u SW %u.%u.%u",
+             (unsigned)report[1],
+             (unsigned)report[2],
+             (unsigned)report[3],
+             (unsigned)sw_patch);
 }
 
 static size_t report_len(uint8_t report_id)
@@ -227,6 +254,9 @@ static size_t report_len(uint8_t report_id)
 
     case SH2_REPORT_TIMEBASE_REFERENCE:
         return SH2_REPORT_LEN_TIMEBASE;
+
+    case SH2_REPORT_PRODUCT_ID_RESPONSE:
+        return SH2_REPORT_LEN_PRODUCT_ID_RESPONSE;
 
     case SH2_REPORT_GET_FEATURE_RESPONSE:
         return SH2_REPORT_LEN_FEATURE_RESPONSE;
@@ -288,6 +318,10 @@ static void process_sh2_reports(uint8_t channel, const uint8_t *cargo, size_t ca
             handle_command_response(report);
             break;
 
+        case SH2_REPORT_PRODUCT_ID_RESPONSE:
+            handle_product_id_response(report);
+            break;
+
         case SH2_REPORT_TIMEBASE_REFERENCE:
         case SH2_REPORT_TIMESTAMP_REBASE:
         case SH2_REPORT_GET_FEATURE_RESPONSE:
@@ -323,7 +357,23 @@ static void handle_shtp_frame(const uint8_t *payload, size_t len)
         return;
     }
 
-    process_sh2_reports(channel, &payload[SHTP_HEADER_LEN], packet_len - SHTP_HEADER_LEN);
+    const uint8_t *cargo = &payload[SHTP_HEADER_LEN];
+    const size_t cargo_len = packet_len - SHTP_HEADER_LEN;
+
+    if (channel == SHTP_CHANNEL_EXECUTABLE)
+    {
+        if (cargo_len >= 1 && cargo[0] == SH2_EXECUTABLE_RESET_COMPLETE)
+        {
+            bno_executable_reset_seen = true;
+            ESP_LOGD(UART_TAG, "BNO08x executable reset complete");
+        }
+        return;
+    }
+
+    if (channel == SHTP_CHANNEL_COMMAND)
+        return;
+
+    process_sh2_reports(channel, cargo, cargo_len);
 }
 
 static void handle_uart_frame(const uint8_t *frame, size_t len)
@@ -340,8 +390,8 @@ static void handle_uart_frame(const uint8_t *frame, size_t len)
     {
         if (len >= 3)
         {
-            host_write_available = (uint16_t)frame[1] | ((uint16_t)frame[2] << 8);
-            ESP_LOGD(UART_TAG, "BNO write credit %u bytes", host_write_available);
+            const uint16_t host_write_available = (uint16_t)frame[1] | ((uint16_t)frame[2] << 8);
+            ESP_LOGD(UART_TAG, "BNO write credit %u bytes", (unsigned)host_write_available);
         }
     }
 }
@@ -408,14 +458,18 @@ static void uart_event_task(void *arg)
             {
             case UART_DATA:
             {
-                const int len = uart_read_bytes(
-                    UART_NUM,
-                    rxbuf,
-                    event.size < sizeof(rxbuf) ? event.size : sizeof(rxbuf),
-                    0);
-                if (len > 0)
+                size_t buffered = event.size;
+                while (buffered > 0)
                 {
+                    const size_t to_read = buffered < sizeof(rxbuf) ? buffered : sizeof(rxbuf);
+                    const int len = uart_read_bytes(UART_NUM, rxbuf, to_read, pdMS_TO_TICKS(2));
+                    if (len <= 0)
+                        break;
+
                     process_uart_bytes(rxbuf, (size_t)len);
+
+                    if (uart_get_buffered_data_len(UART_NUM, &buffered) != ESP_OK)
+                        break;
                 }
                 break;
             }
@@ -471,27 +525,6 @@ static void write_uart_frame(uint8_t protocol_id, const uint8_t *payload, size_t
     uart_write_byte_spaced(BNO_UART_FLAG);
 }
 
-static void request_write_credit(void)
-{
-    host_write_available = 0;
-    write_uart_frame(BNO_UART_PROTOCOL_CONTROL, NULL, 0);
-}
-
-static bool wait_for_write_credit(size_t needed_bytes, TickType_t timeout_ticks)
-{
-    const TickType_t start = xTaskGetTickCount();
-
-    while ((xTaskGetTickCount() - start) < timeout_ticks)
-    {
-        if (host_write_available >= needed_bytes)
-            return true;
-
-        vTaskDelay(pdMS_TO_TICKS(1));
-    }
-
-    return false;
-}
-
 static void send_shtp_packet(uint8_t channel, const uint8_t *cargo, size_t cargo_len)
 {
     uint8_t packet[SHTP_HEADER_LEN + 32];
@@ -509,14 +542,49 @@ static void send_shtp_packet(uint8_t channel, const uint8_t *cargo, size_t cargo
     packet[3] = tx_sequence[channel]++;
     memcpy(&packet[SHTP_HEADER_LEN], cargo, cargo_len);
 
-    request_write_credit();
-    if (!wait_for_write_credit(packet_len, pdMS_TO_TICKS(50)))
+    write_uart_frame(BNO_UART_PROTOCOL_SHTP, packet, packet_len);
+}
+
+static bool wait_for_bno_startup(TickType_t timeout_ticks)
+{
+    const TickType_t start = xTaskGetTickCount();
+
+    while ((xTaskGetTickCount() - start) < timeout_ticks)
     {
-        ESP_LOGW(UART_TAG, "sending SHTP packet without BNO write credit");
+        if (bno_executable_reset_seen && bno_sh2_init_seen)
+            return true;
+
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 
-    write_uart_frame(BNO_UART_PROTOCOL_SHTP, packet, packet_len);
-    host_write_available = 0;
+    ESP_LOGW(UART_TAG,
+             "BNO08x startup sync timed out: exec=%u sh2=%u",
+             (unsigned)bno_executable_reset_seen,
+             (unsigned)bno_sh2_init_seen);
+    return false;
+}
+
+static bool wait_for_product_id_response(TickType_t timeout_ticks)
+{
+    const TickType_t start = xTaskGetTickCount();
+
+    while ((xTaskGetTickCount() - start) < timeout_ticks)
+    {
+        if (bno_product_id_seen)
+            return true;
+
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    ESP_LOGW(UART_TAG, "BNO08x product ID response timed out");
+    return false;
+}
+
+static void reset_bno_startup_markers(void)
+{
+    bno_executable_reset_seen = false;
+    bno_sh2_init_seen = false;
+    bno_product_id_seen = false;
 }
 
 static bool is_successful_frs_write_status(uint8_t status)
@@ -645,6 +713,20 @@ static void send_device_on(void)
     send_shtp_packet(SHTP_CHANNEL_EXECUTABLE, payload, sizeof(payload));
 }
 
+static void send_device_reset(void)
+{
+    const uint8_t payload[] = {0x01};
+    send_shtp_packet(SHTP_CHANNEL_EXECUTABLE, payload, sizeof(payload));
+}
+
+static void send_product_id_request(void)
+{
+    const uint8_t payload[] = {SH2_REPORT_PRODUCT_ID_REQUEST, 0};
+
+    bno_product_id_seen = false;
+    send_shtp_packet(SHTP_CHANNEL_CONTROL, payload, sizeof(payload));
+}
+
 static void send_set_feature(uint8_t report_id, uint32_t interval_us)
 {
     uint8_t payload[17] = {0};  // total packet length of 21 bytes including 4 bytes SHTP header
@@ -706,7 +788,13 @@ int imu_init()
 
     xTaskCreate(uart_event_task, "imu_bno_uart", 6144, NULL, 10, NULL);
 
-    vTaskDelay(pdMS_TO_TICKS(300));
+    reset_bno_startup_markers();
+    send_device_reset();
+    memset(tx_sequence, 0, sizeof(tx_sequence));
+    command_sequence = 0;
+    wait_for_bno_startup(pdMS_TO_TICKS(1000));
+    send_product_id_request();
+    wait_for_product_id_response(pdMS_TO_TICKS(300));
     configure_bno_reports();
 
     ESP_LOGI(UART_TAG, "BNO08x SHTP UART initialized at %d baud", BNO_UART_BAUD);
